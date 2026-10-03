@@ -1,0 +1,24 @@
+{
+  "name": "jobradar-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n web,api \"npm run dev -w @jobradar/web\" \"npm run dev -w @jobradar/api\"",
+    "dev:worker": "npm run dev -w @jobradar/worker",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "@types/node": "^24.0.0"
+  }
+}
