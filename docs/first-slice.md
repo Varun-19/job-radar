@@ -31,3 +31,11 @@ The local-draft persistence limitation above is superseded: jobs, tiers, and edi
 Legacy browser records remain intact and can be explicitly imported. Current empty-state/example data is never imported automatically. Source feeds, résumé evidence, application lifecycle, and outreach workflows remain deferred.
 
 Validation covers stale revisions, atomic rollback, invalid payloads, unexpected origins, profile version history, and persistence after reconnecting.
+
+## Résumé, evidence, and application increment
+
+Résumé import and manual application tracking are now implemented, superseding their deferred status above. Migration 0002 adds immutable résumé versions with original file bytes, source-linked evidence, and one application per saved opportunity. PDF/TXT/Markdown extraction runs locally; readable PDFs are supported, while scanned PDFs need separately supplied text. No AI claims are generated.
+
+Evidence is manually reviewed. Résumé evidence requires an exact source version and a quote present in the extracted text. Applications retain a selected résumé version, explicit or unknown submission date, follow-up date, stage, and append-only notes. Backward/reopened transitions and post-preparation résumé/date corrections require an explanation. Today uses actual saved records and India-time follow-ups.
+
+Validation covers local PDF/text extraction, invalid inputs, immutable versions and original byte retrieval, evidence provenance, application uniqueness, correction invariants, transaction rollback, and unknown dates. Live sources, semantic interpretation, MCP, and recruiter/outreach workflows remain deferred.

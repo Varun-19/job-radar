@@ -4,3 +4,4 @@ export const healthSchema = z.object({ status: z.enum(['ok','degraded']), servic
 export type HealthResponse = z.infer<typeof healthSchema>;
 
 export * from './workspace';
+export * from './tracking';

@@ -14,7 +14,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   await sql.unsafe(await readFile(new URL('../packages/db/migrations/0001_workspace.sql',import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -33,6 +33,27 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
    snapshot=await store.mutate(snapshot.revision,[{type:'shortlist',id:job.id,shortlisted:true}]);
    await store.close();store=createWorkspaceStore(isolated.toString());snapshot=await store.read();assert.equal(snapshot.jobs[0].shortlisted,true);
    assert.equal((await sql`SELECT * FROM workspace_activities`).length,5);
+   const resumeId=randomUUID();
+   snapshot=await store.mutate(snapshot.revision,[{type:'add-resume',id:resumeId,label:'Staff resume',filename:'resume.txt',mediaType:'text/plain',text:'Led a frontend platform migration.'}]);
+   snapshot=await store.mutate(snapshot.revision,[{type:'add-resume',id:randomUUID(),label:'Staff resume',filename:'resume-v2.txt',mediaType:'text/plain',text:'Led a frontend platform migration. Improved reliability.'}]);
+   assert.deepEqual(snapshot.resumes.map(r=>r.version).sort(),[1,2]);
+   const invalidEvidence={id:randomUUID(),capability:'GraphQL',category:'Frontend',description:'Unsupported claim',strength:'deep' as const,source:'resume' as const,resumeVersionId:resumeId,quote:'Built GraphQL federation',reference:''};
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'add-evidence',evidence:invalidEvidence}]),InvalidMutation);
+   snapshot=await store.mutate(snapshot.revision,[{type:'add-evidence',evidence:{...invalidEvidence,capability:'Platform migration',description:'Led migration',strength:'strong',quote:'Led a frontend platform migration.'}}]);
+   assert.equal(snapshot.evidence.length,1);
+   const appId=randomUUID();
+   const input={id:appId,jobId:job.id,stage:'applied' as const,resumeVersionId:resumeId,followUpAt:'2026-10-10',submittedAt:null,note:'Historical application; submission date unknown'};
+   snapshot=await store.mutate(snapshot.revision,[{type:'create-application',application:input}]);
+   assert.equal(snapshot.applications[0].submittedAt,null);
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'create-application',application:{...input,id:randomUUID()}}]),InvalidMutation);
+   const revisionBeforeCorrection=snapshot.revision;
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'update-application',id:appId,stage:'preparing',resumeVersionId:resumeId,followUpAt:null,submittedAt:null,note:''}]),InvalidMutation);
+   assert.equal((await store.read()).revision,revisionBeforeCorrection);
+   snapshot=await store.mutate(snapshot.revision,[{type:'update-application',id:appId,stage:'recruiter',resumeVersionId:resumeId,followUpAt:null,submittedAt:null,note:'Recruiter replied'}]);
+   assert.equal(snapshot.applications[0].resumeVersionId,resumeId);
+   assert.equal(snapshot.activities.filter(a=>a.type==='create-application'||a.type==='update-application').length,2);
+   assert.equal((await store.resumeFile!(resumeId))?.base64,Buffer.from('Led a frontend platform migration.').toString('base64'));
+
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
  }finally{await admin.unsafe(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();}
 });

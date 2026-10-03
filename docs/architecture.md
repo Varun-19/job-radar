@@ -2,7 +2,7 @@
 
 ## Decision
 
-Use an npm-workspaces TypeScript monorepo with separate web, HTTP API, and worker applications. Next.js supplies React routing/rendering; Fastify supplies the explicit backend boundary. PostgreSQL is the future canonical data store, accessed through Drizzle. The API initializes a database connection when DATABASE_URL is configured.
+Use an npm-workspaces TypeScript monorepo with separate web, HTTP API, and worker applications. Next.js supplies React routing/rendering; Fastify supplies the explicit backend boundary. PostgreSQL is the canonical data store, accessed through Drizzle. The API initializes a database connection when DATABASE_URL is configured.
 
 ## Dependency direction
 
@@ -34,7 +34,7 @@ API binds to loopback by default and allows only the configured web origin. No a
 
 ## Next step
 
-Implement versioned profiles and evidence contracts, reviewed persistence schema/migrations, and application/activity invariants before connecting live sources or semantic analysis.
+Connect live source adapters with posting provenance and reviewed classification fixtures. Build the ChatGPT/Codex tool boundary before assisted semantic analysis; recruiter and outreach workflows remain separate increments.
 
 ## Persistence increment
 
@@ -43,3 +43,9 @@ Migration 0001 introduces workspace revision, search profiles, immutable profile
 Profile edits preserve previous definitions and increment version. Existing draft assessments are manual and do not claim automatic re-evaluation when profile criteria change. Local browser view preferences (selected profile and sort) remain local, while business data lives in PostgreSQL. Previous browser drafts remain available for explicit import; an import does not overwrite existing records or delete browser data.
 
 No authentication is implemented yet. Bind locally only; cross-origin mutation requests are rejected, but origin checking is not a substitute for authentication before hosting.
+
+## Tracking increment
+
+Migration 0002 adds résumé versions, reviewed candidate evidence, and applications referencing saved opportunity drafts. Résumé metadata/text is returned in workspace snapshots; original bytes remain in the database and are available through a dedicated download route. The upload endpoint locally extracts readable PDFs and plain text, retains the original, and shares revision-checked transactions with other workspace mutations. Binary content is omitted from activity payloads.
+
+The domain defines application correction rules. Services enforce valid job/résumé references, unique applications per job, source quotes for résumé evidence, immutable résumé series/version records, and explanatory notes for corrections. Submission dates are user supplied and stay null when unknown. The web client consumes these contracts; Today derives counts and due follow-ups from persisted records.

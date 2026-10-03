@@ -1,6 +1,6 @@
 # job-radar
 
-The UI, API, and shared services now support PostgreSQL-backed job drafts, company preferences, and versioned search profiles. Live job discovery, application tracking, outreach delivery, and AI analysis remain pending.
+The UI, API, and shared services support PostgreSQL-backed job drafts, company preferences, versioned search profiles, immutable résumé versions, reviewed professional evidence, and manual application tracking. Today shows saved records and due follow-ups. Live job discovery, recruiter workflows, outreach delivery, and AI analysis remain pending.
 
 ## Start
 
@@ -72,7 +72,7 @@ packages/
   services/             Shared workspace use cases and transactions
   integrations/         Planned: job sources and readiness/delivery adapters
 apps/mcp/               Planned: thin tool interface over services
-tests/                  API contract smoke tests
+tests/                  Domain, API, extraction, and persistence tests
 ```
 
 `integrations` and `mcp` are architectural reservations, not implemented packages.
@@ -87,3 +87,11 @@ tests/                  API contract smoke tests
 - Database code is internal to the server. Use contracts as the public API, not database rows.
 
 See [architecture](docs/architecture.md) and [first-slice scope](docs/first-slice.md).
+
+## Résumés and applications
+
+At `/evidence`, upload a readable PDF, TXT, or Markdown résumé (up to 4 MB), or paste text. Processing runs on the local API without an AI provider. The original bytes and extracted text are retained in immutable versions; reuse a series label to add a version. Scanned PDFs require text pasted separately or external OCR. Résumé evidence must cite a quote found in its selected version. Project and manual evidence can be recorded separately.
+
+At `/applications`, track a saved opportunity, stage, exact résumé version, actual submission date when known, follow-up date, and notes. Unknown dates remain unknown. Reopening, moving backwards, or correcting a résumé/submission date after preparation requires an explanation. Updates append activity history and do not send applications or messages. Today surfaces due follow-ups using India time.
+
+Run `npm run db:migrate` for the additive tracking migration before using these screens. Résumé interpretation, evidence-based job suggestions, and live discovery are not implemented yet.

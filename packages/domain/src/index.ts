@@ -4,3 +4,4 @@ export type CompanyTier = 'strategic-target' | 'target' | 'watch' | 'opportunist
 export type SearchProfileId = string;
 
 export * from './opportunities';
+export * from './applications';
