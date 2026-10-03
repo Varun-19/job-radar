@@ -1,6 +1,6 @@
 # job-radar
 
-First slice: executable UI and backend shells, worker entry point, and shared package boundaries. No live job feeds, database persistence, outreach delivery, or AI calls yet. The opportunity workbench supports browser-local drafts and company preferences; these are not canonical database records.
+The UI, API, and shared services now support PostgreSQL-backed job drafts, company preferences, and versioned search profiles. Live job discovery, application tracking, outreach delivery, and AI analysis remain pending.
 
 ## Start
 
@@ -22,20 +22,35 @@ npm run dev:worker
 
 The worker currently prints its unconfigured status and exits. It does not consume a queue yet.
 
-## Optional database shell
+## Database setup
 
 ```sh
 npm run db:up
 npm run db:down
 ```
 
-Docker is required for these commands. The application does not connect to PostgreSQL in this slice. The volume persists after `db:down`. Compose credentials are for local development only.
+Docker is required for these commands. The volume persists after `db:down`. Compose credentials are for local development only. Copy `.env.example` to `.env`, then run `npm run db:migrate` before starting the app.
+
+If PostgreSQL binaries are installed locally, use the isolated project instance instead:
+
+```sh
+npm run db:local
+# Set DATABASE_URL in .env to postgresql://jobradar:jobradar@127.0.0.1:55432/jobradar
+npm run db:migrate
+npm run dev
+```
+
+This instance binds to localhost on port 55432 and stores data under ignored `.local/postgres`. Stop it with `npm run db:local:stop`. Development credentials are not appropriate for remote hosting.
+
+The current machine has this local instance configured. Do not delete `.local` to clean build output: it contains your database.
+
+Run `npm run test:db` to test persistence in a newly created temporary database; the test removes only that database afterward.
 
 ## Configuration
 
 API defaults: `API_HOST=127.0.0.1`, `API_PORT=4000`, `WEB_ORIGIN=http://localhost:3000`.
 Web client default: `NEXT_PUBLIC_API_URL=http://localhost:4000`.
-The root `.env.example` documents future database configuration. Environment files are not automatically loaded by the API shell; provide overrides in your shell. Next.js accepts `apps/web/.env.local`.
+The root `.env.example` documents database configuration. The API and migration command load root `.env`; explicit shell environment variables take precedence. Next.js accepts `apps/web/.env.local`.
 Only public configuration may use `NEXT_PUBLIC_` variables. Credentials must remain server-side.
 
 ## Source layout
@@ -54,13 +69,13 @@ packages/
   contracts/src/        Shared Zod request/response schemas
   domain/src/           Pure business types and rules
   db/src/               Server-only PostgreSQL/Drizzle access
-  services/             Planned: use cases shared by API, worker, and MCP
+  services/             Shared workspace use cases and transactions
   integrations/         Planned: job sources and readiness/delivery adapters
 apps/mcp/               Planned: thin tool interface over services
 tests/                  API contract smoke tests
 ```
 
-`services`, `integrations`, and `mcp` are architectural reservations, not implemented packages.
+`integrations` and `mcp` are architectural reservations, not implemented packages.
 
 ## Boundaries
 

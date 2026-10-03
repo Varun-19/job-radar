@@ -1,4 +1,6 @@
 import { z } from 'zod';
 
-export const healthSchema = z.object({ status: z.literal('ok'), service: z.literal('jobradar-api'), version: z.string(), database: z.literal('not-configured') });
+export const healthSchema = z.object({ status: z.enum(['ok','degraded']), service: z.literal('jobradar-api'), version: z.string(), database: z.enum(['not-configured','connected','unavailable']) });
 export type HealthResponse = z.infer<typeof healthSchema>;
+
+export * from './workspace';

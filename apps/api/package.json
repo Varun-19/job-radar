@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --import tsx --watch src/index.ts",
-    "start": "node --import tsx src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/index.ts",
+    "start": "node --env-file-if-exists=../../.env --import tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "fastify": "^5.6.1",
     "@fastify/cors": "^11.1.0",
-    "@jobradar/contracts": "0.1.0"
+    "@jobradar/contracts": "0.1.0",
+    "@jobradar/db": "0.1.0",
+    "@jobradar/services": "0.1.0"
   }
 }

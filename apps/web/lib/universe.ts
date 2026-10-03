@@ -10,6 +10,5 @@ export const companies = [
 'GE Vernova','GE HealthCare','Schneider Electric','Wabtec','NetApp','Nextiva','Diligent','Pearson','Sabre','Thoughtworks','Oleria','Noon','Skillz/FIRY','Coupang','Aerospike','ChargePoint','Instawork',
 'UnitedHealth Group','Caterpillar','Asha Health','YOptima','Altimate AI','Supa'
 ].sort((a,b) => a.localeCompare(b));
-export const profiles = [{ id: 'staff', name: 'Staff · Frontend / Platform / AI Product' }, { id: 'sap', name: 'SAP consultant · exploratory' }];
 export const tiers = ['strategic-target','target','watch','opportunistic','excluded','unclassified'] as const;
 export const tierLabels = { 'strategic-target': 'Strategic target', target: 'Target', watch: 'Watch', opportunistic: 'Opportunistic', excluded: 'Excluded', unclassified: 'Unclassified' };

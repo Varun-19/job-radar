@@ -1,16 +1,35 @@
 'use client';
-import { useEffect, useState } from 'react';
-import type { CompanyTier, OpportunityDraft } from '@jobradar/domain';
-interface Workspace { profile: string; tiers: Record<string, Record<string, CompanyTier>>; jobs: OpportunityDraft[]; sorts?: Record<string, string> }
-const initial: Workspace = { profile: 'staff', tiers: {}, jobs: [] };
-const key = 'jobradar.workbench.v1';
+import { useEffect, useRef, useState } from 'react';
+import { initialProfiles, workspaceSchema, jobSchema, tierSchema, type WorkspaceSnapshot, type WorkspaceMutation, type SearchProfile } from '@jobradar/contracts';
+import type { CompanyTier } from '@jobradar/domain';
+interface Workspace extends WorkspaceSnapshot { profile:string; sorts:Record<string,string> }
+const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const empty:Workspace={revision:0,profiles:initialProfiles,tiers:{},jobs:[],profile:'staff',sorts:{}};
+async function request(path:string,options?:RequestInit):Promise<WorkspaceSnapshot> {const response=await fetch(`${api}${path}`,options);if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.message??`Backend request failed (${response.status}).`);}return workspaceSchema.parse(await response.json());}
 export function useWorkspace() {
- const [data, setData] = useState<Workspace>(initial);
- const [ready, setReady] = useState(false);
- const [error, setError] = useState('');
- useEffect(() => { try { const raw = localStorage.getItem(key); if(raw) { const parsed = JSON.parse(raw); if(parsed && ['staff','sap'].includes(parsed.profile) && Array.isArray(parsed.jobs) && parsed.tiers && typeof parsed.tiers === 'object') setData(parsed); else setError('Saved workspace format is invalid. Changes will not be saved.'); } } catch { setError('Browser storage is unavailable or invalid. Changes will not be saved.'); } setReady(true); }, []);
- function update(change: (previous: Workspace) => Workspace) { const next = change(data); setData(next); try { if(!error) localStorage.setItem(key, JSON.stringify(next)); } catch { setError('Unable to save locally. Keep this tab open to retain changes.'); } }
- const tierOf = (company: string): CompanyTier => data.tiers[data.profile]?.[company.trim().toLowerCase()] ?? 'unclassified';
- const setTier = (company: string, tier: CompanyTier) => update(d => ({ ...d, tiers: { ...d.tiers, [d.profile]: { ...d.tiers[d.profile], [company.trim().toLowerCase()]: tier } } }));
- return { data, update, tierOf, setTier, ready, error };
+ const [data,setData]=useState<Workspace>(empty); const state=useRef(data);
+ const [ready,setReady]=useState(false);const [saving,setSaving]=useState(false);const [error,setError]=useState('');const [connected,setConnected]=useState(false);const [hasLocalDrafts,setHasLocalDrafts]=useState(false);
+ const queue=useRef(Promise.resolve());
+ function apply(next:Workspace) {state.current=next;setData(next);}
+ useEffect(()=>{let alive=true; request('/workspace').then(snapshot=>{if(!alive)return;let prefs:{profile?:string;sorts?:Record<string,string>}={};try{prefs=JSON.parse(localStorage.getItem('jobradar.view.v1')??'{}');const old=JSON.parse(localStorage.getItem('jobradar.workbench.v1')??'null');setHasLocalDrafts(!!(old?.jobs?.length||Object.keys(old?.tiers??{}).length));}catch{}const profile=snapshot.profiles.some(p=>p.id===prefs.profile)?prefs.profile!:'staff';apply({...snapshot,profile,sorts:prefs.sorts??{}});setConnected(true);}).catch(e=>{if(alive)setError(`${e.message} Start the database/API, then reload.`);}).finally(()=>{if(alive)setReady(true);});return()=>{alive=false;};},[]);
+ function persistView(profile:string,sorts:Record<string,string>){try{localStorage.setItem('jobradar.view.v1',JSON.stringify({profile,sorts}));}catch{setError('View preference could not be saved in this browser.');}}
+ function mutate(mutations:WorkspaceMutation[]) {
+  if(!connected){setError('Connect the database before saving changes.');return Promise.resolve(false);}
+  setSaving(true);setError('');
+  const task=queue.current.then(async()=>{const snapshot=await request('/workspace/mutations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:state.current.revision,mutations})});apply({...snapshot,profile:state.current.profile,sorts:state.current.sorts});});
+  const settled=task.then(()=>true).catch(async e=>{setError(`${e.message} Your change was not saved.`);try{const snapshot=await request('/workspace');apply({...snapshot,profile:state.current.profile,sorts:state.current.sorts});}catch{setConnected(false);}return false;}).finally(()=>setSaving(false));queue.current=settled.then(()=>{});return settled;
+ }
+ function update(change:(previous:Workspace)=>Workspace) {
+  const old=state.current;const next=change(old);const mutations:WorkspaceMutation[]=[];
+  for(const job of next.jobs){const existing=old.jobs.find(j=>j.id===job.id);if(!existing)mutations.push({type:'add-job',job});else if(existing.shortlisted!==job.shortlisted)mutations.push({type:'shortlist',id:job.id,shortlisted:job.shortlisted});}
+  for(const [profileId,tiers] of Object.entries(next.tiers))for(const [company,tier] of Object.entries(tiers))if(old.tiers[profileId]?.[company]!==tier)mutations.push({type:'set-tier',profileId,company,tier});
+  if(next.profile!==old.profile||next.sorts!==old.sorts){apply({...old,profile:next.profile,sorts:next.sorts});persistView(next.profile,next.sorts);}
+  return mutations.length?mutate(mutations):Promise.resolve(true);
+ }
+ const tierOf=(company:string):CompanyTier=>data.tiers[data.profile]?.[company.trim().toLowerCase()]??'unclassified';
+ const setTier=(company:string,tier:CompanyTier)=>mutate([{type:'set-tier',profileId:data.profile,company,tier}]);
+ const saveProfile=(profile:SearchProfile)=>mutate([{type:'save-profile',profile}]);
+ async function importLocalDrafts(){try{const old=JSON.parse(localStorage.getItem('jobradar.workbench.v1')??'null');const mutations:WorkspaceMutation[]=[];for(const raw of old?.jobs??[]){const job=jobSchema.parse(raw);if(!state.current.jobs.some(j=>j.id===job.id))mutations.push({type:'add-job',job});}for(const [profileId,tiers] of Object.entries(old?.tiers??{}))for(const [company,raw] of Object.entries(tiers as object)){if(state.current.tiers[profileId]?.[company]===undefined)mutations.push({type:'set-tier',profileId,company,tier:tierSchema.parse(raw)});}if(mutations.length>500)throw new Error('Too many records for one import.');if(mutations.length)await mutate(mutations); // original browser records are always retained
+ }catch(e){setError(e instanceof Error?e.message:'Import failed.');}}
+ return {data,update,tierOf,setTier,saveProfile,ready,saving,error,connected,hasLocalDrafts,importLocalDrafts};
 }

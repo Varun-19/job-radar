@@ -23,3 +23,11 @@ The opportunity route now implements a responsive list/detail interface, company
 This increment stores drafts/preferences in browser localStorage, not PostgreSQL. It is a UI workflow preview and not canonical application tracking. Staff and SAP are selectable presets; full profile editing is still deferred. No jobs are fetched automatically. Assessments are manually entered and default to review/unknown. The optional example preview uses fictional jobs and preferences and does not import them into saved records.
 
 Ordering: relevant strategic targets, relevant targets, discoveries, needs review, outside target. Unknown eligibility enters review; explicit ineligibility, outside-role alignment, and excluded companies enter outside target. Within relevant groups: role alignment, professional fit, freshness. Newest-first is an explicit user override. Tests cover company priority, profile-specific tiers, exclusion, and eligibility gates.
+
+## PostgreSQL and search-profile increment
+
+The local-draft persistence limitation above is superseded: jobs, tiers, and editable profiles now persist through the API in PostgreSQL. Profile selection and sort remain browser view preferences. Staff and exploratory SAP presets are seeded from shared contracts, with create, edit, and duplicate forms for additional directions. Profile definitions have immutable versions; writes create activity records.
+
+Legacy browser records remain intact and can be explicitly imported. Current empty-state/example data is never imported automatically. Source feeds, résumé evidence, application lifecycle, and outreach workflows remain deferred.
+
+Validation covers stale revisions, atomic rollback, invalid payloads, unexpected origins, profile version history, and persistence after reconnecting.
