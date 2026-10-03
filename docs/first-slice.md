@@ -1,3 +1,7 @@
+# Historical implementation notes
+
+This file records earlier increments. The current release supersedes deferred items below; see completion-plan.md and operations.md.
+
 # First slice
 
 ## Implemented

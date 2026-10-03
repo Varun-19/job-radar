@@ -2,16 +2,16 @@ import postgres from 'postgres';
 import { randomUUID, createHash } from 'node:crypto';
 import { fetchBoard } from '@jobradar/integrations';
 import { boardSchema, radarSchema, scheduleInputSchema, type JobBoard } from '@jobradar/contracts';
-import { postingContentChanged } from '@jobradar/domain';
+import { postingContentChanged, candidateSignals } from '@jobradar/domain';
 export class ScanBusy extends Error {}
 export function createRadarService(url:string,fetcher:(board:JobBoard)=>ReturnType<typeof fetchBoard>=fetchBoard) {
  const sql=postgres(url,{max:3});
  async function ensure(){await sql`INSERT INTO scan_schedules(board_id) SELECT id FROM job_boards ON CONFLICT DO NOTHING`;}
- async function read(){await ensure();const [schedules,runs,inbox]=await Promise.all([
+ async function read(profileId?:string){await ensure();const [schedules,runs,inbox]=await Promise.all([
   sql`SELECT board_id AS "boardId",enabled,interval_minutes AS "intervalMinutes",next_run_at AS "nextRunAt",lease_until AS "leaseUntil" FROM scan_schedules ORDER BY board_id`,
   sql`SELECT id,board_id AS "boardId",status,started_at AS "startedAt",finished_at AS "finishedAt",message,count,new_count AS "newCount",changed_count AS "changedCount" FROM scan_runs ORDER BY started_at DESC LIMIT 100`,
   sql`SELECT id,board_id AS "boardId",posting,version,first_seen_at AS "firstSeenAt",last_seen_at AS "lastSeenAt",changed_at AS "changedAt",change FROM discovery_inbox ORDER BY changed_at DESC`
- ]);const dates=(rows:any[])=>rows.map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>[key,value instanceof Date?value.toISOString():value])));return radarSchema.parse({schedules:dates(schedules),runs:dates(runs),inbox:dates(inbox)});}
+ ]);const dates=(rows:any[])=>rows.map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>[key,value instanceof Date?value.toISOString():value])));let filtered=[...inbox];if(profileId){const [profile]=await sql`SELECT config FROM search_profiles WHERE id=${profileId}`;filtered=profile?.config.discovery?inbox.filter(row=>candidateSignals(row.posting,profile.config.discovery).candidate):[];}return radarSchema.parse({schedules:dates(schedules),runs:dates(runs),inbox:dates(filtered.slice(0,1000)),totalInbox:filtered.length,truncated:filtered.length>1000});}
  async function configure(input:unknown){const setting=scheduleInputSchema.parse(input);await ensure();const result=await sql`UPDATE scan_schedules SET enabled=${setting.enabled},interval_minutes=${setting.intervalMinutes},next_run_at=now() WHERE board_id=${setting.boardId} RETURNING board_id`;if(!result.length)throw new Error('Unknown company board.');return read();}
  async function scan(boardId:string,dueOnly=false){
   await ensure();const token=randomUUID();const runId=randomUUID();

@@ -14,7 +14,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -90,6 +90,38 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
    assert.equal(snapshot.applications[0].resumeVersionId,resumeId);
    assert.equal(snapshot.applications.find(a=>a.id===pinnedApplication.id)?.postingRevisionId,pinnedId);
 
+   const currentPosting=snapshot.postingRevisions.filter(r=>r.jobId===sourced.id).sort((a,b)=>b.version-a.version)[0];
+   const proposal={id:randomUUID(),jobId:sourced.id,profileVersion:snapshot.profiles.find(p=>p.id===profile.id)!.version,postingRevisionId:currentPosting.id,roleFamily:'other' as const,alignment:'selective' as const,fit:'partial' as const,eligibility:'unknown' as const,levelAlignment:'calibration_required' as const,locationAlignment:'in_target' as const,staffScope:'unknown' as const,readiness:'unknown' as const,readinessNotes:'',reasoning:'Evidence supports a partial match; level and eligibility require confirmation.',postingQuotes:['New scope'],evidenceIds:[snapshot.evidence[0].id],strengths:['Migration'],gaps:[],unknowns:['Scope'],producer:'assisted_review' as const};
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'propose-evaluation',evaluation:{...proposal,postingQuotes:['Fabricated quote']}}]),InvalidMutation);
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'propose-evaluation',evaluation:{...proposal,evidenceIds:[]}}]),InvalidMutation);
+   snapshot=await store.mutate(snapshot.revision,[{type:'propose-evaluation',evaluation:proposal}]);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.alignment,'review');
+   assert.equal(snapshot.evaluations[0].status,'pending');
+   snapshot=await store.mutate(snapshot.revision,[{type:'review-evaluation',id:proposal.id,decision:'accepted'}]);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.evaluationId,proposal.id);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.fit,'partial');
+   assert.equal(snapshot.applications.find(a=>a.id===pinnedApplication.id)?.postingRevisionId,pinnedId);
+   const stale={...proposal,id:randomUUID()};snapshot=await store.mutate(snapshot.revision,[{type:'propose-evaluation',evaluation:stale}]);
+   snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile:{...snapshot.profiles.find(p=>p.id===profile.id)!,name:'Changed targeting'}}]);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.evaluationId,undefined);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.fit,'unknown');
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'review-evaluation',id:stale.id,decision:'accepted'}]),InvalidMutation);
+   snapshot=await store.mutate(snapshot.revision,[{type:'review-evaluation',id:stale.id,decision:'rejected'}]);
+
+   const contactId=randomUUID();const contact={id:contactId,name:'Fixture recruiter',company:'Test Co',title:'Recruiter',profileUrl:'https://example.com/recruiter',sourceUrl:'https://example.com/hiring',sourceQuote:'Hiring SAP consultants',observedAt:'2026-10-03',recruitingStatus:'recruiting' as const,notes:'Fixture only',jobIds:[]};
+   snapshot=await store.mutate(snapshot.revision,[{type:'save-contact',contact}]);
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'save-contact',contact:{...contact,id:randomUUID()}}]),InvalidMutation);
+   const outreach={id:randomUUID(),contactId,jobId:null,channel:'linkedin' as const,message:'Hello, are you recruiting for SAP roles?',stage:'draft' as const,sentAt:null,followUpAt:'2026-10-05',note:''};
+   snapshot=await store.mutate(snapshot.revision,[{type:'save-outreach',outreach}]);
+   assert.equal(snapshot.outreach[0].jobId,null);assert.equal(snapshot.contacts[0].jobIds.length,0);
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'save-outreach',outreach:{...outreach,stage:'sent'}}]),InvalidMutation);
+   snapshot=await store.mutate(snapshot.revision,[{type:'save-outreach',outreach:{...outreach,stage:'sent',sentAt:'2026-10-03T15:00:00Z'}}]);
+   assert.equal(snapshot.outreach[0].stage,'sent');
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'save-outreach',outreach:{...outreach,message:'Changed delivered text',stage:'sent',sentAt:'2026-10-03T15:00:00Z'}}]),InvalidMutation);
+   assert.equal(snapshot.applications.find(a=>a.id===pinnedApplication.id)?.postingRevisionId,pinnedId);
+
+   snapshot=await store.mutate(snapshot.revision,[{type:'dismiss-alert',id:'candidate:fixture:1'}]);assert.ok(snapshot.dismissedAlerts.includes('candidate:fixture:1'));
+
    let mode='normal';let release:()=>void=()=>{};let entered:()=>void=()=>{};
    let fixturePosting={company:'Test Co',title:'Staff Frontend Engineer',location:'Bengaluru',url:'https://example.com/staff',description:'Own frontend architecture',source:{provider:'greenhouse' as const,board:'fixture',postingId:'radar-1',fetchedAt:new Date().toISOString(),updatedAt:null}};
    const radar=createRadarService(isolated.toString(),async()=>{if(mode==='failed')throw new Error('Fixture network failure');if(mode==='block'){entered();await new Promise<void>(resolve=>{release=resolve;});}return {jobs:[fixturePosting],fetchedAt:fixturePosting.source.fetchedAt};});
@@ -100,8 +132,10 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
     await radar.scan('fixture-board');state=await radar.read();assert.equal(state.inbox[0].version,2);assert.equal(state.runs[0].changedCount,1);
     assert.equal((await sql`SELECT * FROM source_observations`).length,2);
     mode='failed';await assert.rejects(radar.scan('fixture-board'));state=await radar.read();assert.equal(state.inbox.length,1);assert.equal(state.runs[0].status,'failed');
-    mode='block';const started=new Promise<void>(resolve=>{entered=resolve;});const running=radar.scan('fixture-board');await started;await assert.rejects(radar.scan('fixture-board'),ScanBusy);release();await running;
+    mode='block';const started=new Promise<void>(resolve=>{entered=resolve;});const running=radar.scan('fixture-board');await started;await assert.rejects(radar.scan('fixture-board'),ScanBusy);await sql`UPDATE scan_schedules SET lease_until=now()-interval '1 second' WHERE board_id='fixture-board'`;mode='normal';await radar.scan('fixture-board');release();await assert.rejects(running,ScanBusy);state=await radar.read();assert.ok(state.runs.some(r=>r.status==='failed'&&r.message==='Scan lease was replaced.'));assert.equal((await sql`SELECT * FROM source_observations`).length,2);
     mode='normal';await radar.configure({boardId:'fixture-board',enabled:true,intervalMinutes:1440});await radar.tick();state=await radar.read();assert.equal(state.schedules.find(s=>s.boardId==='fixture-board')?.enabled,true);assert.equal(state.runs[0].status,'succeeded');
+    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile:{...snapshot.profiles.find(p=>p.id===profile.id)!,discovery:{levelTerms:['Staff'],roleTerms:['frontend'],locationTerms:['Bengaluru'],excludedTitleTerms:[]}}}]);
+    assert.equal((await radar.read(profile.id)).inbox.length,1);assert.equal((await radar.read('staff')).inbox.length,0);
     const count=state.runs.length;await radar.tick();assert.equal((await radar.read()).runs.length,count);
    }finally{await radar.close();}
   }finally{if(store){await store.close();store=undefined;}await sql.end();}

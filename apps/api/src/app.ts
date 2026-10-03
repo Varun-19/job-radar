@@ -1,3 +1,4 @@
+import { allowedRequestHost } from './access';
 import { fetchBoard, DiscoveryFailure } from './discovery';
 import { z } from 'zod';
 import { scheduleInputSchema } from '@jobradar/contracts';
@@ -12,6 +13,7 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
  const app=Fastify({logger:true,bodyLimit:6_000_000});
  const origin=process.env.WEB_ORIGIN??'http://localhost:3000';
  app.register(cors,{origin});
+ app.addHook('onRequest',async(request,reply)=>{if(!allowedRequestHost(request.headers.host)||(request.headers.origin&&request.headers.origin!==origin))return reply.code(403).send({message:'Local workspace access only.'});});
  app.get('/health',async (_request,reply)=>{let database:'connected'|'unavailable'|'not-configured'=store?'connected':'not-configured';if(store)try{await store.read();}catch{database='unavailable';reply.code(503);}return healthSchema.parse({status:database==='unavailable'?'degraded':'ok',service:'jobradar-api',version:'0.2.0',database});});
  app.get('/workspace',async (_request,reply)=>{if(!store)return reply.code(503).send({message:'Database is not configured.'});return store.read();});
  app.post('/workspace/mutations',async(request,reply)=>{
@@ -21,7 +23,7 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
   const parsed=mutationRequestSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Invalid workspace mutation.',issues:parsed.error.issues});
   try{return await store.mutate(parsed.data.expectedRevision,parsed.data.mutations);}catch(e){if(e instanceof WorkspaceConflict)return reply.code(409).send({message:e.message});if(e instanceof InvalidMutation)return reply.code(400).send({message:e.message});throw e;}
  });
- app.get('/radar',async(_request,reply)=>radar?radar.read():reply.code(503).send({message:'Radar is not configured.'}));
+ app.get<{Querystring:{profileId?:string}}>('/radar',async(request,reply)=>radar?radar.read(request.query.profileId):reply.code(503).send({message:'Radar is not configured.'}));
  app.post('/radar/schedules',async(request,reply)=>{
   if(request.headers.origin&&request.headers.origin!==origin)return reply.code(403).send({message:'Origin not allowed.'});
   if(!radar)return reply.code(503).send({message:'Radar is not configured.'});
@@ -31,8 +33,8 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
  app.post('/radar/scan',async(request,reply)=>{
   if(request.headers.origin&&request.headers.origin!==origin)return reply.code(403).send({message:'Origin not allowed.'});
   if(!radar)return reply.code(503).send({message:'Radar is not configured.'});
-  const parsed=z.object({boardId:z.string().min(1).max(100)}).safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Choose a company board.'});
-  try{await radar.scan(parsed.data.boardId);return await radar.read();}catch(e){return reply.code(e instanceof ScanBusy?409:502).send({message:e instanceof Error?e.message:'Scan failed.'});}
+  const parsed=z.object({boardId:z.string().min(1).max(100),profileId:z.string().max(100).optional()}).safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Choose a company board.'});
+  try{await radar.scan(parsed.data.boardId);return await radar.read(parsed.data.profileId);}catch(e){return reply.code(e instanceof ScanBusy?409:502).send({message:e instanceof Error?e.message:'Scan failed.'});}
  });
  app.post('/discovery/preview',async(request,reply)=>{
   if(request.headers.origin && request.headers.origin!==origin)return reply.code(403).send({message:'Origin not allowed.'});

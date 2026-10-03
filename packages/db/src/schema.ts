@@ -14,3 +14,10 @@ export const applications = pgTable('applications',{id:text('id').primaryKey(),j
 export const boards=pgTable('job_boards',{id:text('id').primaryKey(),data:jsonb('data').$type<WorkspaceSnapshot['boards'][number]>().notNull()});
 
 export const postingRevisions=pgTable('posting_revisions',{id:uuid('id').notNull().unique(),jobId:text('job_id').notNull().references(()=>jobs.id),version:integer('version').notNull(),data:jsonb('data').$type<WorkspaceSnapshot['postingRevisions'][number]>().notNull()},t=>[primaryKey({columns:[t.jobId,t.version]})]);
+
+export const evaluations=pgTable('evaluation_proposals',{id:text('id').primaryKey(),jobId:text('job_id').notNull().references(()=>jobs.id),data:jsonb('data').$type<WorkspaceSnapshot['evaluations'][number]>().notNull()});
+
+export const contacts=pgTable('recruiter_contacts',{id:text('id').primaryKey(),data:jsonb('data').$type<WorkspaceSnapshot['contacts'][number]>().notNull()});
+export const outreach=pgTable('outreach_records',{id:text('id').primaryKey(),contactId:text('contact_id').notNull().references(()=>contacts.id),jobId:text('job_id').references(()=>jobs.id),data:jsonb('data').$type<WorkspaceSnapshot['outreach'][number]>().notNull()});
+
+export const alertDismissals=pgTable('alert_dismissals',{id:text('id').primaryKey(),createdAt:timestamp('created_at',{withTimezone:true}).defaultNow().notNull()});

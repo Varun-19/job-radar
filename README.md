@@ -1,6 +1,8 @@
 # job-radar
 
-The UI, API, and shared services support PostgreSQL-backed job drafts, company preferences, versioned search profiles, immutable résumé versions, reviewed professional evidence, and manual application tracking. Today shows saved records and due follow-ups. On-demand discovery from configurable Greenhouse and Lever company boards is available. Scheduled discovery, recruiter workflows, outreach delivery, and AI analysis remain pending.
+JobRadar is a local personal job and recruiter workspace. It supports flexible profiles, company preferences, scheduled Greenhouse/Lever/Ashby discovery, immutable posting and résumé history, reviewed professional evidence, analysis proposals, manual applications, independent recruiter outreach drafts, follow-ups and in-app alerts. It makes no paid model calls and never sends messages or applications.
+
+The current local workspace contains live Staff Frontend results for Bengaluru / India Remote. Personal records live in PostgreSQL and ignored `.local`, not in this repository. See [release verification](docs/release-verification.md) and [operations](docs/operations.md).
 
 ## Start
 
@@ -20,7 +22,7 @@ npm run build
 npm run dev:worker
 ```
 
-The worker currently prints its unconfigured status and exits. It does not consume a queue yet.
+The worker checks enabled schedules every minute. PostgreSQL leases prevent concurrent scans of a board. It must remain running for automatic discovery; laptop sleep pauses scanning.
 
 ## Database setup
 
@@ -64,25 +66,25 @@ apps/
     src/app.ts          HTTP app factory; independently testable
     src/index.ts        API startup and shutdown
   worker/
-    src/index.ts        Background worker shell
+    src/index.ts        Leased discovery scheduler
 packages/
   contracts/src/        Shared Zod request/response schemas
   domain/src/           Pure business types and rules
   db/src/               Server-only PostgreSQL/Drizzle access
   services/             Shared workspace use cases and transactions
-  integrations/         Planned: job sources and readiness/delivery adapters
-apps/mcp/               Planned: thin tool interface over services
+  integrations/         Greenhouse, Lever and Ashby source adapters
+apps/api/src/mcp.ts     Local stdio MCP entry point over shared services
 tests/                  Domain, API, extraction, and persistence tests
 ```
 
-`integrations` and `mcp` are architectural reservations, not implemented packages.
+MCP tools expose scoped reads and pending evaluation proposals. Acceptance stays in the UI. Run `npm run mcp` from an MCP client; stdout is reserved for protocol messages.
 
 ## Boundaries
 
 - Browser code may import contracts and browser-safe domain types.
 - Browser code must not import database, services, credentials, or integrations.
 - Next.js server components render the interface; business state changes belong to API services.
-- API, worker, and future MCP handlers share application services rather than making independent business decisions.
+- API, worker, and MCP handlers share application services rather than making independent business decisions.
 - Domain code stays independent of React, HTTP, SQL, and AI providers.
 - Database code is internal to the server. Use contracts as the public API, not database rows.
 

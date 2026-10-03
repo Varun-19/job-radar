@@ -19,6 +19,8 @@ export function opportunityGroup(job: OpportunityDraft, tier: CompanyTier): Oppo
 export function compareOpportunities(a: OpportunityDraft, b: OpportunityDraft, tierOf: (company: string) => CompanyTier): number {
   const group = groupOrder.indexOf(opportunityGroup(a, tierOf(a.company))) - groupOrder.indexOf(opportunityGroup(b, tierOf(b.company)));
   if (group) return group;
+  const tiers:Record<CompanyTier,number>={'strategic-target':0,target:1,watch:2,opportunistic:3,unclassified:4,excluded:5};
+  const preference=tiers[tierOf(a.company)]-tiers[tierOf(b.company)];if(preference)return preference;
   const alignment = { primary: 0, selective: 1, review: 2, outside: 3 };
   const fit = { strong: 0, partial: 1, unknown: 2 };
   return alignment[a.alignment] - alignment[b.alignment] || fit[a.fit] - fit[b.fit] || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id);

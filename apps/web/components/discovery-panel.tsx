@@ -72,10 +72,10 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
    <form onSubmit={addBoard}>
     <div className="form-grid">
      <label>Company name<input name="company" required maxLength={200}/></label>
-     <label>Provider<select name="provider"><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="lever-eu">Lever EU</option></select></label>
+     <label>Provider<select name="provider"><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="lever-eu">Lever EU</option><option value="ashby">Ashby</option></select></label>
      <label>Board token<input name="token" required pattern="[a-zA-Z0-9_-]+" maxLength={100}/></label>
     </div>
-    <p className="fine-print">Use the token from the company’s public URL: job-boards.greenhouse.io/TOKEN or jobs.lever.co/TOKEN. Verify that it belongs to the company you entered.</p>
+    <p className="fine-print">Use the token from the company’s public URL: job-boards.greenhouse.io/TOKEN jobs.lever.co/TOKEN, or jobs.ashbyhq.com/TOKEN. Verify that it belongs to the company you entered.</p>
     <button className="secondary" disabled={!connected||saving||busy}>Save board</button>
    </form>
   </details>

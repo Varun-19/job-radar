@@ -23,3 +23,7 @@ test('fetch is pinned to the provider host and rejects failures without inventin
  assert.throws(()=>normalizeBoard(board,{jobs:[{...posting,absolute_url:'javascript:alert(1)'}]},now));
 });
 test('discovery endpoint rejects unexpected origins and invalid board inputs before fetching',async()=>{const app=createApp();try{assert.equal((await app.inject({method:'POST',url:'/discovery/preview',headers:{origin:'https://other.example'},payload:{board}})).statusCode,403);assert.equal((await app.inject({method:'POST',url:'/discovery/preview',payload:{board:{...board,token:'../'}}})).statusCode,400);}finally{await app.close();}});
+test('Ashby retains publication time and secondary locations, excluding unlisted postings',()=>{
+ const jobs=normalizeBoard({...board,provider:'ashby'}, {jobs:[{title:'Staff Frontend Engineer',location:'Bengaluru',secondaryLocations:[{location:'India Remote'}],isListed:true,isRemote:null,descriptionPlain:'Own frontend architecture',jobUrl:'https://jobs.ashbyhq.com/fixture/abc-123',publishedAt:'2026-10-01T00:00:00Z'},{title:'Unlisted',location:'India',isListed:false,jobUrl:'https://jobs.ashbyhq.com/fixture/hidden'}]},now);
+ assert.equal(jobs.length,1);assert.equal(jobs[0].source.postingId,'abc-123');assert.equal(jobs[0].source.publishedAt,'2026-10-01T00:00:00Z');assert.equal(jobs[0].source.updatedAt,null);assert.match(jobs[0].location,/India Remote/);
+});
