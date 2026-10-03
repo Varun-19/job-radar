@@ -1,8 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { createDatabase } from '@jobradar/db';
-import { workspaceMeta, profiles, profileVersions, preferences, jobs, activities, resumes, evidence, applications, boards } from '@jobradar/db/schema';
-import { requiresCorrectionNote } from '@jobradar/domain';
+import { workspaceMeta, profiles, profileVersions, preferences, jobs, activities, resumes, evidence, applications, boards, postingRevisions } from '@jobradar/db/schema';
+import { requiresCorrectionNote, sameSource, postingContentChanged } from '@jobradar/domain';
 import { initialProfiles, workspaceSchema, type WorkspaceSnapshot, type WorkspaceMutation } from '@jobradar/contracts';
 export interface WorkspaceStore { read():Promise<WorkspaceSnapshot>; mutate(revision:number,mutations:WorkspaceMutation[]):Promise<WorkspaceSnapshot>; close():Promise<void>; resumeFile?(id:string):Promise<{metadata:WorkspaceSnapshot['resumes'][number];base64:string}|undefined> }
 export class WorkspaceConflict extends Error {}
@@ -14,11 +14,12 @@ export function createWorkspaceStore(url:string):WorkspaceStore {
  async function read() { await (seeded ??= seed().catch(e=>{seeded=undefined;throw e;})); return db.transaction(async tx => {
   await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`);
   const [meta] = await tx.select().from(workspaceMeta).where(eq(workspaceMeta.id,1));
+  const revisionRows=await tx.select().from(postingRevisions);
   const boardRows=await tx.select().from(boards);
   const profileRows=await tx.select().from(profiles); const jobRows=await tx.select().from(jobs); const tierRows=await tx.select().from(preferences);
   const resumeRows=await tx.select({metadata:resumes.metadata}).from(resumes);const evidenceRows=await tx.select().from(evidence);const applicationRows=await tx.select().from(applications);const activityRows=await tx.select().from(activities).orderBy(activities.revision,activities.createdAt);
   const tiers:WorkspaceSnapshot['tiers']={};for(const row of tierRows){(tiers[row.profileId]??={})[row.company]=row.tier as WorkspaceSnapshot['tiers'][string][string];}
-  return workspaceSchema.parse({revision:meta.revision,boards:boardRows.map(r=>r.data),profiles:profileRows.map(r=>r.config).sort((a,b)=>a.id.localeCompare(b.id)),jobs:jobRows.map(r=>r.data),tiers,resumes:resumeRows.map(r=>r.metadata),evidence:evidenceRows.map(r=>r.data),applications:applicationRows.map(r=>r.data),activities:activityRows.map(r=>({...r,createdAt:r.createdAt.toISOString()}))});
+  return workspaceSchema.parse({revision:meta.revision,postingRevisions:revisionRows.map(r=>r.data),boards:boardRows.map(r=>r.data),profiles:profileRows.map(r=>r.config).sort((a,b)=>a.id.localeCompare(b.id)),jobs:jobRows.map(r=>r.data),tiers,resumes:resumeRows.map(r=>r.metadata),evidence:evidenceRows.map(r=>r.data),applications:applicationRows.map(r=>r.data),activities:activityRows.map(r=>({...r,createdAt:r.createdAt.toISOString()}))});
  }); }
  return {read,close:connection.close,async resumeFile(id){const [row]=await db.select().from(resumes).where(eq(resumes.id,id));return row?{metadata:row.metadata,base64:row.originalBase64}:undefined;}, async mutate(revision,mutations) {
   await read();
@@ -26,7 +27,17 @@ export function createWorkspaceStore(url:string):WorkspaceStore {
    const [meta]=await tx.select().from(workspaceMeta).where(eq(workspaceMeta.id,1)).for('update');
    if(meta.revision!==revision)throw new WorkspaceConflict('Workspace changed. Reload and retry.');
    for(const mutation of mutations){
-    if(mutation.type==='save-board'){
+    if(mutation.type==='refresh-job'){
+     const [job]=await tx.select().from(jobs).where(eq(jobs.id,mutation.id));if(!job)throw new InvalidMutation('Unknown job.');
+     if(!sameSource(job.data.source,mutation.posting.source))throw new InvalidMutation('Refresh must reference the same source posting.');
+     if(mutation.posting.source.fetchedAt<job.data.source!.fetchedAt)throw new InvalidMutation('This snapshot is older than the saved posting. Fetch the board again.');
+     const changed=postingContentChanged(job.data,mutation.posting);
+     const data={...job.data,...mutation.posting,...(changed?{alignment:'review' as const,fit:'unknown' as const,eligibility:'unknown' as const}:{})};
+     const history=await tx.select().from(postingRevisions).where(eq(postingRevisions.jobId,job.id));
+     const version=Math.max(0,...history.map(r=>r.version))+1;const id=randomUUID();
+     await tx.insert(postingRevisions).values({id,jobId:job.id,version,data:{id,jobId:job.id,version,capturedAt:mutation.posting.source.fetchedAt,snapshot:data}});
+     await tx.update(jobs).set({data}).where(eq(jobs.id,job.id));
+    }else if(mutation.type==='save-board'){
      await tx.insert(boards).values({id:mutation.board.id,data:mutation.board}).onConflictDoUpdate({target:boards.id,set:{data:mutation.board}});
     }else if(mutation.type==='assess-job'){
      const [job]=await tx.select().from(jobs).where(eq(jobs.id,mutation.id));if(!job)throw new InvalidMutation('Unknown job.');
@@ -43,6 +54,7 @@ export function createWorkspaceStore(url:string):WorkspaceStore {
      const [existing]=await tx.select().from(jobs).where(eq(jobs.id,mutation.job.id));if(existing)throw new InvalidMutation('Draft already exists.');
      if(mutation.job.source){const all=await tx.select().from(jobs).where(eq(jobs.profileId,mutation.job.profileId));if(all.some(r=>r.data.source?.provider===mutation.job.source!.provider&&r.data.source?.board===mutation.job.source!.board&&r.data.source?.postingId===mutation.job.source!.postingId))throw new InvalidMutation('This source posting is already saved for this profile.');}
      await tx.insert(jobs).values({id:mutation.job.id,profileId:mutation.job.profileId,data:mutation.job});
+     if(mutation.job.source){const id=randomUUID();await tx.insert(postingRevisions).values({id,jobId:mutation.job.id,version:1,data:{id,jobId:mutation.job.id,version:1,capturedAt:mutation.job.source.fetchedAt,snapshot:mutation.job}});}
     } else if(mutation.type==='shortlist') {
      const [job]=await tx.select().from(jobs).where(eq(jobs.id,mutation.id));if(!job)throw new InvalidMutation('Unknown job.');
      await tx.update(jobs).set({data:{...job.data,shortlisted:mutation.shortlisted}}).where(eq(jobs.id,mutation.id));
@@ -79,7 +91,9 @@ export function createWorkspaceStore(url:string):WorkspaceStore {
      const now=new Date().toISOString();
      const jobId=mutation.type==='create-application'?mutation.application.jobId:existing!.jobId;
      const submittedAt=input.submittedAt;
-     const data={id:input.id,jobId,stage:input.stage,resumeVersionId:input.resumeVersionId,followUpAt:input.followUpAt,createdAt:existing?.data.createdAt??now,updatedAt:now,submittedAt};
+     const postingHistory=mutation.type==='create-application'?await tx.select().from(postingRevisions).where(eq(postingRevisions.jobId,jobId)):[];
+     const postingRevisionId=existing?.data.postingRevisionId??(mutation.type==='create-application'?postingHistory.sort((a,b)=>b.version-a.version)[0]?.id??null:null);
+     const data={id:input.id,jobId,stage:input.stage,resumeVersionId:input.resumeVersionId,followUpAt:input.followUpAt,createdAt:existing?.data.createdAt??now,updatedAt:now,submittedAt,postingRevisionId};
      await tx.insert(applications).values({id:input.id,jobId,resumeVersionId:input.resumeVersionId,data}).onConflictDoUpdate({target:applications.id,set:{resumeVersionId:input.resumeVersionId,data}});
     } else {
      const [profile]=await tx.select().from(profiles).where(eq(profiles.id,mutation.profileId));if(!profile)throw new InvalidMutation('Unknown search profile.');

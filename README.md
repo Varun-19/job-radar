@@ -98,10 +98,18 @@ Run `npm run db:migrate` for the additive tracking migration before using these 
 
 ## Live discovery
 
-In `/opportunities`, choose **Discover live jobs**. A verified Datadog Greenhouse board is seeded; add other company tokens from their public Greenhouse or Lever board URLs (including Lever EU). Boards persist in PostgreSQL. Fetching is read-only and never imports automatically. Filter titles and locations with comma-separated terms, then save selected postings into the active profile’s Needs review queue. The same process supports Staff, SAP, or other role searches.
+In `/opportunities`, choose **Discover live jobs**. Verified Greenhouse boards for Cloudflare, Databricks, Datadog, Figma, and MongoDB are seeded; add other company tokens from their public Greenhouse or Lever board URLs (including Lever EU). Boards persist in PostgreSQL. Fetching is read-only and never imports automatically. Filter titles and locations with comma-separated terms, then save selected postings into the active profile’s Needs review queue. The same process supports Staff, SAP, or other role searches.
 
 Provider, board token, posting ID, retrieval time, and available source update time persist with each imported posting. Imports keep fit and eligibility unknown. Duplicate source postings are rejected within the same profile, while different profiles can review them independently. Use **Save assessment** in the job detail to record your review; company tiers keep relevant target companies first. The imported timestamp is not a publication date.
 
-This increment covers manually initiated board snapshots, with 20-second requests, fixed provider hosts, no redirects, and bounded response sizes. It does not cover the entire company universe, arbitrary career websites, LinkedIn, scheduled scans, posting revision refresh, or closure inference. A failed fetch leaves existing jobs unchanged.
+This increment covers manually initiated board snapshots, with 20-second requests, fixed provider hosts, no redirects, and bounded response sizes. It does not cover the entire company universe, arbitrary career websites, LinkedIn, scheduled scans, automatic posting refresh or closure inference. A failed fetch leaves existing jobs unchanged.
 
 Adapter references: [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html), [Lever Postings API](https://github.com/lever/postings-api).
+
+## Posting refresh and discovery review
+
+Discovery results are paginated in groups of 25. **Select this page** selects visible postings; selections can accumulate across pages up to 100, and changing filters or profile clears them. The board dropdown orders configured boards by the selected profile’s company tiers. Fetching never imports or overwrites saved postings.
+
+For a previously saved posting, **Update saved posting** or **Record latest check** accepts a new observation. All observations have immutable versions viewable under Posting history in the opportunity detail. Changed title, location, company label, description, or URL returns the role to Needs review with unknown fit and eligibility. Unchanged content preserves your assessment. Shortlists, application IDs, résumé selections, and submission dates are retained. New applications reference the posting version present when tracking began; older application records without that reference remain unknown.
+
+Migration 0004 preserves an initial version of existing imported postings and adds four verified starter boards without changing company tiers or importing jobs. Scheduled scans and coverage beyond these configured providers remain pending.

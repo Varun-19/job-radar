@@ -14,7 +14,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking','0003_discovery'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -64,6 +64,32 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
    assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.source?.postingId,'123');
    assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.alignment,'primary');
    assert.equal(snapshot.activities.filter(a=>a.type==='assess-job').length,1);
+   assert.equal(snapshot.postingRevisions.filter(r=>r.jobId===sourced.id).length,1);
+   snapshot=await store.mutate(snapshot.revision,[{type:'create-application',application:{...input,id:randomUUID(),jobId:sourced.id}}]);
+   const pinnedApplication=snapshot.applications.find(a=>a.jobId===sourced.id)!;
+   const pinnedId=snapshot.postingRevisions.find(r=>r.jobId===sourced.id)!.id;
+   assert.equal(pinnedApplication.postingRevisionId,pinnedId);
+   const posting={company:sourced.company,title:sourced.title,location:sourced.location,description:sourced.description,url:'https://example.com/123',source:{...sourced.source,fetchedAt:new Date(Date.now()+1000).toISOString()}};
+   snapshot=await store.mutate(snapshot.revision,[{type:'refresh-job',id:sourced.id,posting}]);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.alignment,'review');
+   snapshot=await store.mutate(snapshot.revision,[{type:'assess-job',id:sourced.id,alignment:'primary',fit:'strong',eligibility:'confirmed'}]);
+   snapshot=await store.mutate(snapshot.revision,[{type:'refresh-job',id:sourced.id,posting:{...posting,source:{...posting.source,fetchedAt:new Date(Date.now()+2000).toISOString()}}}]);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.alignment,'primary');
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.fit,'strong');
+   const changed={...posting,title:'Staff SAP Platform Consultant',description:'New scope',source:{...posting.source,fetchedAt:new Date(Date.now()+3000).toISOString()}};
+   snapshot=await store.mutate(snapshot.revision,[{type:'refresh-job',id:sourced.id,posting:changed}]);
+   const refreshed=snapshot.jobs.find(j=>j.id===sourced.id)!;
+   assert.equal(refreshed.alignment,'review');assert.equal(refreshed.fit,'unknown');assert.equal(refreshed.eligibility,'unknown');
+   assert.equal(refreshed.shortlisted,sourced.shortlisted);assert.equal(refreshed.profileId,sourced.profileId);
+   const history=snapshot.postingRevisions.filter(r=>r.jobId===sourced.id).sort((a,b)=>a.version-b.version);
+   assert.equal(history.length,4);assert.equal(history[0].snapshot.title,sourced.title);assert.equal(history[3].snapshot.title,changed.title);
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'refresh-job',id:sourced.id,posting:{...changed,source:{...changed.source,postingId:'wrong'}}}]),InvalidMutation);
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'refresh-job',id:sourced.id,posting}]),InvalidMutation);
+   assert.equal((await store.read()).revision,snapshot.revision);
+   assert.equal(snapshot.jobs.find(j=>j.profileId==='staff'&&j.source?.postingId==='123')?.title,sourced.title);
+   assert.equal(snapshot.applications[0].resumeVersionId,resumeId);
+   assert.equal(snapshot.applications.find(a=>a.id===pinnedApplication.id)?.postingRevisionId,pinnedId);
+
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
  }finally{await admin.unsafe(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();}
 });
