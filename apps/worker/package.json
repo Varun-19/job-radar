@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node --import tsx src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env --import tsx src/index.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jobradar/integrations": "0.1.0",
+    "@jobradar/services": "0.1.0"
   }
 }

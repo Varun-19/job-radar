@@ -13,6 +13,8 @@
     "@jobradar/db": "0.1.0",
     "@jobradar/contracts": "0.1.0",
     "drizzle-orm": "^0.45.3",
-    "@jobradar/domain": "0.1.0"
+    "@jobradar/domain": "0.1.0",
+    "@jobradar/integrations": "0.1.0",
+    "postgres": "^3.4.7"
   }
 }

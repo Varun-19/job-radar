@@ -4,7 +4,7 @@ import { resumeSchema, evidenceSchema, applicationSchema, activitySchema, tracki
 const id = z.string().trim().min(1).max(100);
 export const tierSchema = z.enum(['strategic-target','target','watch','opportunistic','excluded','unclassified']);
 const list = z.array(z.string().trim().min(1).max(200)).max(100);
-export const profileSchema = z.object({ id, name:z.string().trim().min(1).max(150), version:z.number().int().positive(), roleFamilies:list, levels:list, locations:list, keywords:list, exclusions:list });
+export const profileSchema = z.object({ id, name:z.string().trim().min(1).max(150), version:z.number().int().positive(), roleFamilies:list, levels:list, locations:list, keywords:list, exclusions:list,discovery:z.object({levelTerms:list,roleTerms:list,locationTerms:list,excludedTitleTerms:list}).optional() });
 export type SearchProfile = z.infer<typeof profileSchema>;
 export const jobSchema = z.object({ id, profileId:id, company:z.string().trim().min(1).max(200), title:z.string().trim().min(1).max(300), location:z.string().trim().min(1).max(300), description:z.string().max(50000), url:z.string().max(2000).refine(value => {if(!value)return true;try{return ['http:','https:'].includes(new URL(value).protocol);}catch{return false;}}, 'Use an HTTP or HTTPS URL'), alignment:z.enum(['primary','selective','review','outside']), fit:z.enum(['strong','partial','unknown']), eligibility:z.enum(['confirmed','unknown','ineligible']), createdAt:z.iso.datetime(), shortlisted:z.boolean(), source:provenanceSchema.optional() });
 export const postingRevisionSchema=z.object({id:z.string(),jobId:id,version:z.number().int().positive(),capturedAt:z.iso.datetime(),snapshot:jobSchema});

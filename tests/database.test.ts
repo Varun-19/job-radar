@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
-import { createWorkspaceStore, WorkspaceConflict, InvalidMutation } from '@jobradar/services';
+import { createWorkspaceStore, WorkspaceConflict, InvalidMutation, createRadarService, ScanBusy } from '@jobradar/services';
 
 test('PostgreSQL persists workspace changes, versions profiles, and rejects stale writes atomically', {skip:process.env.RUN_DB_TESTS!=='1'}, async()=>{
  const url=process.env.DATABASE_URL;if(!url)throw new Error('DATABASE_URL required');
@@ -14,7 +14,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -90,6 +90,20 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
    assert.equal(snapshot.applications[0].resumeVersionId,resumeId);
    assert.equal(snapshot.applications.find(a=>a.id===pinnedApplication.id)?.postingRevisionId,pinnedId);
 
+   let mode='normal';let release:()=>void=()=>{};let entered:()=>void=()=>{};
+   let fixturePosting={company:'Test Co',title:'Staff Frontend Engineer',location:'Bengaluru',url:'https://example.com/staff',description:'Own frontend architecture',source:{provider:'greenhouse' as const,board:'fixture',postingId:'radar-1',fetchedAt:new Date().toISOString(),updatedAt:null}};
+   const radar=createRadarService(isolated.toString(),async()=>{if(mode==='failed')throw new Error('Fixture network failure');if(mode==='block'){entered();await new Promise<void>(resolve=>{release=resolve;});}return {jobs:[fixturePosting],fetchedAt:fixturePosting.source.fetchedAt};});
+   try{
+    await radar.scan('fixture-board');let state=await radar.read();assert.equal(state.inbox.length,1);assert.equal(state.runs[0].newCount,1);
+    await radar.scan('fixture-board');state=await radar.read();assert.equal(state.inbox[0].version,1);assert.equal(state.runs[0].changedCount,0);
+    fixturePosting={...fixturePosting,description:'Own cross-team frontend platform architecture'};
+    await radar.scan('fixture-board');state=await radar.read();assert.equal(state.inbox[0].version,2);assert.equal(state.runs[0].changedCount,1);
+    assert.equal((await sql`SELECT * FROM source_observations`).length,2);
+    mode='failed';await assert.rejects(radar.scan('fixture-board'));state=await radar.read();assert.equal(state.inbox.length,1);assert.equal(state.runs[0].status,'failed');
+    mode='block';const started=new Promise<void>(resolve=>{entered=resolve;});const running=radar.scan('fixture-board');await started;await assert.rejects(radar.scan('fixture-board'),ScanBusy);release();await running;
+    mode='normal';await radar.configure({boardId:'fixture-board',enabled:true,intervalMinutes:1440});await radar.tick();state=await radar.read();assert.equal(state.schedules.find(s=>s.boardId==='fixture-board')?.enabled,true);assert.equal(state.runs[0].status,'succeeded');
+    const count=state.runs.length;await radar.tick();assert.equal((await radar.read()).runs.length,count);
+   }finally{await radar.close();}
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
  }finally{await admin.unsafe(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();}
 });
