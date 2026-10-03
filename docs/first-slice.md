@@ -15,3 +15,11 @@
 Database schema/migrations, queue consumers, profile forms, persistent records, supplied company-universe import, résumé import, live source adapters, MCP, AI analysis, alerts, and outreach delivery. The UI intentionally has empty states rather than fabricated jobs or counts.
 
 The reviewed specification calls for classification review before automated semantic analysis. That remains a future milestone.
+
+## Opportunity workbench increment
+
+The opportunity route now implements a responsive list/detail interface, company-first grouping, profile switching, manual draft entry, shortlisting, search/company filters, queue filters, and saved per-profile sort preferences. The company route preserves the supplied historical universe and supports per-profile tier editing. All company tiers begin unclassified.
+
+This increment stores drafts/preferences in browser localStorage, not PostgreSQL. It is a UI workflow preview and not canonical application tracking. Staff and SAP are selectable presets; full profile editing is still deferred. No jobs are fetched automatically. Assessments are manually entered and default to review/unknown. The optional example preview uses fictional jobs and preferences and does not import them into saved records.
+
+Ordering: relevant strategic targets, relevant targets, discoveries, needs review, outside target. Unknown eligibility enters review; explicit ineligibility, outside-role alignment, and excluded companies enter outside target. Within relevant groups: role alignment, professional fit, freshness. Newest-first is an explicit user override. Tests cover company priority, profile-specific tiers, exclusion, and eligibility gates.

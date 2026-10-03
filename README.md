@@ -1,6 +1,6 @@
 # job-radar
 
-First slice: executable UI and backend shells, worker entry point, and shared package boundaries. No live jobs, persistence, outreach delivery, or AI calls yet.
+First slice: executable UI and backend shells, worker entry point, and shared package boundaries. No live job feeds, database persistence, outreach delivery, or AI calls yet. The opportunity workbench supports browser-local drafts and company preferences; these are not canonical database records.
 
 ## Start
 
