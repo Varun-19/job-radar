@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
-import { createWorkspaceStore, WorkspaceConflict, InvalidMutation, createRadarService, ScanBusy } from '@jobradar/services';
+import { createWorkspaceStore, WorkspaceConflict, InvalidMutation, createRadarService, createNotificationService, ScanBusy } from '@jobradar/services';
 
 test('PostgreSQL persists workspace changes, versions profiles, and rejects stale writes atomically', {skip:process.env.RUN_DB_TESTS!=='1'}, async()=>{
  const url=process.env.DATABASE_URL;if(!url)throw new Error('DATABASE_URL required');
@@ -14,7 +16,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts','0010_source_presence','0011_notifications','0012_extended_sources','0013_additional_sources'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -124,7 +126,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
 
    let mode='normal';let release:()=>void=()=>{};let entered:()=>void=()=>{};
    let fixturePosting={company:'Test Co',title:'Staff Frontend Engineer',location:'Bengaluru',url:'https://example.com/staff',description:'Own frontend architecture',source:{provider:'greenhouse' as const,board:'fixture',postingId:'radar-1',fetchedAt:new Date().toISOString(),updatedAt:null}};
-   const radar=createRadarService(isolated.toString(),async()=>{if(mode==='failed')throw new Error('Fixture network failure');if(mode==='block'){entered();await new Promise<void>(resolve=>{release=resolve;});}return {jobs:[fixturePosting],fetchedAt:fixturePosting.source.fetchedAt};});
+   const radar=createRadarService(isolated.toString(),async()=>{if(mode==='failed')throw new Error('Fixture network failure');if(mode==='block'){entered();await new Promise<void>(resolve=>{release=resolve;});}return {jobs:mode==='absent'?[]:[fixturePosting],fetchedAt:fixturePosting.source.fetchedAt};});
    try{
     await radar.scan('fixture-board');let state=await radar.read();assert.equal(state.inbox.length,1);assert.equal(state.runs[0].newCount,1);
     await radar.scan('fixture-board');state=await radar.read();assert.equal(state.inbox[0].version,1);assert.equal(state.runs[0].changedCount,0);
@@ -132,11 +134,14 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
     await radar.scan('fixture-board');state=await radar.read();assert.equal(state.inbox[0].version,2);assert.equal(state.runs[0].changedCount,1);
     assert.equal((await sql`SELECT * FROM source_observations`).length,2);
     mode='failed';await assert.rejects(radar.scan('fixture-board'));state=await radar.read();assert.equal(state.inbox.length,1);assert.equal(state.runs[0].status,'failed');
+    mode='absent';await radar.scan('fixture-board');await radar.scan('fixture-board');state=await radar.read();assert.equal(state.inbox[0].missingCount,2);mode='failed';await assert.rejects(radar.scan('fixture-board'));assert.equal((await radar.read()).inbox[0].missingCount,2);mode='normal';await radar.scan('fixture-board');assert.equal((await radar.read()).inbox[0].missingCount,0);
     mode='block';const started=new Promise<void>(resolve=>{entered=resolve;});const running=radar.scan('fixture-board');await started;await assert.rejects(radar.scan('fixture-board'),ScanBusy);await sql`UPDATE scan_schedules SET lease_until=now()-interval '1 second' WHERE board_id='fixture-board'`;mode='normal';await radar.scan('fixture-board');release();await assert.rejects(running,ScanBusy);state=await radar.read();assert.ok(state.runs.some(r=>r.status==='failed'&&r.message==='Scan lease was replaced.'));assert.equal((await sql`SELECT * FROM source_observations`).length,2);
     mode='normal';await radar.configure({boardId:'fixture-board',enabled:true,intervalMinutes:1440});await radar.tick();state=await radar.read();assert.equal(state.schedules.find(s=>s.boardId==='fixture-board')?.enabled,true);assert.equal(state.runs[0].status,'succeeded');
     snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile:{...snapshot.profiles.find(p=>p.id===profile.id)!,discovery:{levelTerms:['Staff'],roleTerms:['frontend'],locationTerms:['Bengaluru'],excludedTitleTerms:[]}}}]);
     assert.equal((await radar.read(profile.id)).inbox.length,1);assert.equal((await radar.read('staff')).inbox.length,0);
     const count=state.runs.length;await radar.tick();assert.equal((await radar.read()).runs.length,count);
+    const directory=await mkdtemp(join(tmpdir(),'jobradar-notification-test-'));const notifications=createNotificationService(isolated.toString(),directory);try{const now=new Date();now.setUTCHours(5,0,0,0);await notifications.queue(snapshot,await radar.read(),now);await notifications.queue(snapshot,await radar.read(),now);const deliveries=await notifications.read();assert.equal(deliveries.filter(row=>row.profileId===profile.id&&row.kind==='daily').length,1);assert.deepEqual(await notifications.deliver({}),{configured:false,sent:0});assert.ok(deliveries.every(row=>row.status==='pending'));}finally{await notifications.close();await rm(directory,{recursive:true,force:true});}
+
    }finally{await radar.close();}
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
  }finally{await admin.unsafe(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();}

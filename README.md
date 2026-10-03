@@ -1,6 +1,6 @@
 # job-radar
 
-JobRadar is a local personal job and recruiter workspace. It supports flexible profiles, company preferences, scheduled Greenhouse/Lever/Ashby discovery, immutable posting and résumé history, reviewed professional evidence, analysis proposals, manual applications, independent recruiter outreach drafts, follow-ups and in-app alerts. It makes no paid model calls and never sends messages or applications.
+JobRadar is a local personal job and recruiter workspace. It supports flexible profiles, company preferences, scheduled company-board and remote-feed discovery, immutable posting and résumé history, reviewed professional evidence, analysis proposals, manual applications, independent recruiter outreach drafts, follow-ups and in-app alerts. It makes no paid model calls and never sends messages or applications.
 
 The current local workspace contains live Staff Frontend results for Bengaluru / India Remote. Personal records live in PostgreSQL and ignored `.local`, not in this repository. See [release verification](docs/release-verification.md) and [operations](docs/operations.md).
 
@@ -72,7 +72,7 @@ packages/
   domain/src/           Pure business types and rules
   db/src/               Server-only PostgreSQL/Drizzle access
   services/             Shared workspace use cases and transactions
-  integrations/         Greenhouse, Lever and Ashby source adapters
+  integrations/         Company-board and remote-feed adapters
 apps/api/src/mcp.ts     Local stdio MCP entry point over shared services
 tests/                  Domain, API, extraction, and persistence tests
 ```
@@ -104,7 +104,7 @@ In `/opportunities`, choose **Discover live jobs**. Verified Greenhouse boards f
 
 Provider, board token, posting ID, retrieval time, and available source update time persist with each imported posting. Imports keep fit and eligibility unknown. Duplicate source postings are rejected within the same profile, while different profiles can review them independently. Use **Save assessment** in the job detail to record your review; company tiers keep relevant target companies first. The imported timestamp is not a publication date.
 
-This increment covers manually initiated board snapshots, with 20-second requests, fixed provider hosts, no redirects, and bounded response sizes. It does not cover the entire company universe, arbitrary career websites, LinkedIn, scheduled scans, automatic posting refresh or closure inference. A failed fetch leaves existing jobs unchanged.
+The first board increment has been expanded: scheduled company scans, enterprise adapters, four remote feeds, source-presence observations and assisted major-provider imports are implemented. The entire company universe and authenticated LinkedIn/Indeed/Naukri/Glassdoor discovery are not covered. See Connections and docs/operations.md for current capabilities and limits. A failed fetch leaves existing jobs unchanged.
 
 Adapter references: [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html), [Lever Postings API](https://github.com/lever/postings-api).
 
@@ -115,3 +115,5 @@ Discovery results are paginated in groups of 25. **Select this page** selects vi
 For a previously saved posting, **Update saved posting** or **Record latest check** accepts a new observation. All observations have immutable versions viewable under Posting history in the opportunity detail. Changed title, location, company label, description, or URL returns the role to Needs review with unknown fit and eligibility. Unchanged content preserves your assessment. Shortlists, application IDs, résumé selections, and submission dates are retained. New applications reference the posting version present when tracking began; older application records without that reference remain unknown.
 
 Migration 0004 preserves an initial version of existing imported postings and adds four verified starter boards without changing company tiers or importing jobs. Scheduled scans and coverage beyond these configured providers remain pending.
+
+The expanded local release adds recruiter-list discovery, résumé text/ATS diagnostics and evidence-grounded drafts, seven MCP tools, login startup and daily/weekly email outbox preparation. SMTP delivery needs local account configuration. Open `/connections` for honest source and delivery coverage.

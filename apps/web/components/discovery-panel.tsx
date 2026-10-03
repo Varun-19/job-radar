@@ -1,7 +1,8 @@
 'use client';
+import { ProviderIntake } from './provider-intake';
 import { useEffect, useState } from 'react';
 import { boardSchema, discoveryResponseSchema, type DiscoveredJob, type WorkspaceMutation, type WorkspaceSnapshot } from '@jobradar/contracts';
-import { sameSource, postingContentChanged } from '@jobradar/domain';
+import { remoteRegion, sameSource, postingContentChanged } from '@jobradar/domain';
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const pageSize = 25;
 export function DiscoveryPanel({data, mutate, saving, connected}: {
@@ -32,8 +33,8 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
  const boards = [...data.boards].sort((a,b)=>priority(a.company)-priority(b.company)||a.company.localeCompare(b.company));
  async function addBoard(e:React.FormEvent<HTMLFormElement>) {
   e.preventDefault();const form=new FormData(e.currentTarget);
-  const parsed=boardSchema.safeParse({id:crypto.randomUUID(),company:form.get('company'),provider:form.get('provider'),token:form.get('token')});
-  if(!parsed.success){setError('Enter a company and a token containing letters, numbers, underscores or hyphens.');return;}
+  const parsed=boardSchema.safeParse({id:crypto.randomUUID(),company:form.get('company'),provider:form.get('provider'),token:form.get('token'),searchText:String(form.get('searchText')??'').trim()||undefined});
+  if(!parsed.success){setError('Enter the company/source name and a supported token format.');return;}
   if(data.boards.some(b=>b.provider===parsed.data.provider && b.token===parsed.data.token)){setError('This board is already configured.');return;}
   if(await mutate([{type:'save-board',board:parsed.data}])) {
    setBoardId(parsed.data.id);setResults([]);setFetchedAt('');setSelected([]);setPage(0);setError('');setNotice('Company board saved.');
@@ -63,8 +64,8 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
   }
  }
  function filter(value:string,setValue:(v:string)=>void){setValue(value);setPage(0);setSelected([]);}
- return <section className="panel field-space discovery-panel" aria-label="Live job discovery">
-  <p className="eyebrow">LIVE COMPANY BOARDS</p>
+ return <><ProviderIntake data={data} profileId={data.profile} mutate={mutate} saving={saving} connected={connected}/><section className="panel field-space discovery-panel" aria-label="Live job discovery">
+  <p className="eyebrow">COMPANY BOARDS & REMOTE FEEDS</p>
   <h2>Discover real postings</h2>
   <p className="muted">Fetch a company board, filter roles and locations, then save promising jobs to {profileName}.</p>
   <details>
@@ -72,17 +73,17 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
    <form onSubmit={addBoard}>
     <div className="form-grid">
      <label>Company name<input name="company" required maxLength={200}/></label>
-     <label>Provider<select name="provider"><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="lever-eu">Lever EU</option><option value="ashby">Ashby</option></select></label>
-     <label>Board token<input name="token" required pattern="[a-zA-Z0-9_-]+" maxLength={100}/></label>
+     <label>Provider<select name="provider"><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="lever-eu">Lever EU</option><option value="ashby">Ashby</option><option value="workable">Workable</option><option value="workday">Workday</option><option value="oracle">Oracle Recruiting Cloud</option><option value="remoteok">Remote OK</option><option value="remotive">Remotive</option><option value="arbeitnow">Arbeitnow</option><option value="weworkremotely">We Work Remotely RSS</option></select></label>
+     <label>Board token<input name="token" required maxLength={200}/></label><label>Source query (optional, Workday)<input name="searchText" maxLength={200} placeholder="frontend"/></label>
     </div>
-    <p className="fine-print">Use the token from the company’s public URL: job-boards.greenhouse.io/TOKEN jobs.lever.co/TOKEN, or jobs.ashbyhq.com/TOKEN. Verify that it belongs to the company you entered.</p>
+    <p className="fine-print">Hosted boards use their company token. Workday: tenant/wdN/site. Oracle: tenant.fa.region.oraclecloud.com/site. Remote feeds: all. Verify company identity before saving. Remote feeds preserve their own source links; country eligibility needs review.</p>
     <button className="secondary" disabled={!connected||saving||busy}>Save board</button>
    </form>
   </details>
   <div className="toolbar field-space discovery-toolbar">
    <label>Company board<select disabled={busy||saving} value={boardId} onChange={e=>{setBoardId(e.target.value);setResults([]);setFetchedAt('');setSelected([]);setPage(0);setNotice('');setError('');}}>
     <option value="">Choose a configured board</option>
-    {boards.map(b=><option key={b.id} value={b.id}>{b.company} · {b.provider}</option>)}
+    {boards.map(b=><option key={b.id} value={b.id}>{b.company} · {b.provider}{b.searchText?` · query: ${b.searchText}`:''}</option>)}
    </select></label>
    <button className="button" onClick={scan} disabled={!boardId||busy||saving}>{busy?'Fetching…':'Fetch postings'}</button>
    <label>Title contains<input placeholder="staff, frontend, SAP" value={terms} onChange={e=>filter(e.target.value,setTerms)}/></label>
@@ -103,9 +104,9 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
     const newer=!!existing&&j.source.fetchedAt>existing.source!.fetchedAt;
     return <article className="evidence-row discovery-result" key={key(j)}>
      <label className="checkbox"><input type="checkbox" disabled={!!existing||saving||(!selected.includes(key(j))&&selected.length>=100)} checked={selected.includes(key(j))&&!existing} onChange={e=>setSelected(prev=>e.target.checked?[...prev,key(j)]:prev.filter(id=>id!==key(j)))}/><strong>{j.title}</strong></label>
-     <p>{j.company} · {j.location}</p>
-     {existing&&<p className="result-status">{changed?'Posting changed since your saved version.':'Saved for this profile.'}</p>}
-     <div className="actions compact"><a className="secondary" href={j.url} target="_blank" rel="noreferrer">Original posting ↗</a>{existing&&<button className="secondary" disabled={saving||busy||!connected||!newer} onClick={()=>refresh(j)}>{changed?'Update saved posting':'Record latest check'}</button>}</div>
+     <p>{j.company} · {j.location} · {j.source.provider==='remoteok'?'Remote OK':j.source.provider}</p>
+     <p className="fine-print">{remoteRegion(j.location,j.description).region} · India eligibility unverified</p>{existing&&<p className="result-status">{changed?'Posting changed since your saved version.':'Saved for this profile.'}</p>}
+     <div className="actions compact"><a className="secondary" href={j.url} target="_blank" rel="noreferrer">Source posting ↗</a>{existing&&<button className="secondary" disabled={saving||busy||!connected||!newer} onClick={()=>refresh(j)}>{changed?'Update saved posting':'Record latest check'}</button>}</div>
      <details><summary>Read description</summary><p className="description">{j.description||'No description provided by source.'}</p></details>
     </article>;
    })}
@@ -113,5 +114,5 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
    {!visible.length&&<p className="discovery-empty">No postings match these filters. Try broader terms.</p>}
   </>}
   <p className="fine-print">Fetching leaves saved jobs unchanged. Updates retain previous versions; changed content returns to Needs review. A missing posting or failed fetch does not confirm closure.</p>
- </section>;
+ </section></>;
 }

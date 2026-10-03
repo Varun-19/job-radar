@@ -1,20 +1,22 @@
+import {readFile} from 'node:fs/promises';
 import { allowedRequestHost } from './access';
 import { fetchBoard, DiscoveryFailure } from './discovery';
 import { z } from 'zod';
 import { scheduleInputSchema } from '@jobradar/contracts';
-import { ScanBusy, type createRadarService } from '@jobradar/services';
+import { ScanBusy, type createNotificationService, type createRadarService } from '@jobradar/services';
 import { randomUUID } from 'node:crypto';
 import { extractResume } from './resume-upload';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { healthSchema, mutationRequestSchema, resumeUploadSchema, discoveryRequestSchema } from '@jobradar/contracts';
 import { WorkspaceConflict, InvalidMutation, type WorkspaceStore } from '@jobradar/services';
-export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createRadarService>) {
+export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createRadarService>,notifications?:ReturnType<typeof createNotificationService>) {
  const app=Fastify({logger:true,bodyLimit:6_000_000});
  const origin=process.env.WEB_ORIGIN??'http://localhost:3000';
  app.register(cors,{origin});
  app.addHook('onRequest',async(request,reply)=>{if(!allowedRequestHost(request.headers.host)||(request.headers.origin&&request.headers.origin!==origin))return reply.code(403).send({message:'Local workspace access only.'});});
  app.get('/health',async (_request,reply)=>{let database:'connected'|'unavailable'|'not-configured'=store?'connected':'not-configured';if(store)try{await store.read();}catch{database='unavailable';reply.code(503);}return healthSchema.parse({status:database==='unavailable'?'degraded':'ok',service:'jobradar-api',version:'0.2.0',database});});
+ app.get('/connections',async()=>({mcp:await readFile(new URL('../../../.local/mcp-registration.json',import.meta.url),'utf8').then(()=> 'Registration recorded; reload client to activate').catch(()=> 'Registration not recorded'),emailConfigured:!!(process.env.SMTP_HOST&&process.env.SMTP_FROM&&process.env.JOBRADAR_ALERT_EMAIL),providers:{linkedin:'assisted intake',indeed:'assisted intake',naukri:'assisted intake',glassdoor:'assisted intake',wellfound:'assisted intake',weworkremotely:'public RSS feed + assisted intake'},notificationHistory:notifications?await notifications.read():[]}));
  app.get('/workspace',async (_request,reply)=>{if(!store)return reply.code(503).send({message:'Database is not configured.'});return store.read();});
  app.post('/workspace/mutations',async(request,reply)=>{
   // CORS alone does not block writes from another origin.
@@ -53,5 +55,5 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
   const filename=file.metadata.filename.replace(/[^a-zA-Z0-9._-]/g,'_');
   return reply.header('Content-Disposition',`attachment; filename="${filename}"`).header('X-Content-Type-Options','nosniff').type(file.metadata.mediaType).send(Buffer.from(file.base64,'base64'));
  });
- app.addHook('onClose',async()=>{await store?.close();await radar?.close();});return app;
+ app.addHook('onClose',async()=>{await store?.close();await radar?.close();await notifications?.close();});return app;
 }

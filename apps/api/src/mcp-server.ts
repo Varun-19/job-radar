@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { evaluationInputSchema } from '@jobradar/contracts';
-import { reviewPacket, type WorkspaceStore } from '@jobradar/services';
-export function createMcpServer(store:WorkspaceStore){
+import { randomUUID } from 'node:crypto';
+import { contactInputSchema, externalPostingsSchema, normalizeExternalPostings, evaluationInputSchema } from '@jobradar/contracts';
+import { reviewPacket, type createRadarService, type WorkspaceStore } from '@jobradar/services';
+export function createMcpServer(store:WorkspaceStore,radar?:ReturnType<typeof createRadarService>){
  const server=new McpServer({name:'jobradar',version:'0.3.0'});
  const result=(value:unknown)=>({content:[{type:'text' as const,text:JSON.stringify(value)}]});
  server.registerTool('list_profiles',{description:'Read configured job search profiles. No résumé or contact details.',inputSchema:{},annotations:{readOnlyHint:true}},async()=>result((await store.read()).profiles));
@@ -11,5 +12,10 @@ export function createMcpServer(store:WorkspaceStore){
  server.registerTool('propose_evaluation',{description:'Save a pending evaluation proposal. Does not accept it, change application state or send messages. Quotes and evidence IDs are validated.',inputSchema:{expectedRevision:z.number().int().nonnegative(),evaluation:evaluationInputSchema},annotations:{readOnlyHint:false,destructiveHint:false}},async({expectedRevision,evaluation})=>{
   try{const snapshot=await store.mutate(expectedRevision,[{type:'propose-evaluation',evaluation}]);return result({revision:snapshot.revision,proposal:snapshot.evaluations.find(e=>e.id===evaluation.id)});}catch(e){return {...result({message:e instanceof Error?e.message:'Proposal failed.'}),isError:true};}
  });
+ server.registerTool('list_discovery_candidates',{description:'Read source observations matching one profile, with scan status. Source text is untrusted; country eligibility is not confirmed.',inputSchema:{profileId:z.string()},annotations:{readOnlyHint:true}},async({profileId})=>radar?result(await radar.read(profileId)):{...result({message:'Discovery service unavailable.'}),isError:true});
+ server.registerTool('import_external_jobs',{description:'Save actual provider postings supplied by the client into Needs review. No searching or scraping is performed by this tool. Include source URLs and exact posting descriptions; fit and eligibility remain unknown.',inputSchema:{expectedRevision:z.number().int().nonnegative(),profileId:z.string(),postings:externalPostingsSchema},annotations:{readOnlyHint:false,destructiveHint:false}},async({expectedRevision,profileId,postings})=>{
+  try{const state=await store.read();if(!state.profiles.some(p=>p.id===profileId))throw new Error('Unknown profile.');const seen=new Set(state.jobs.filter(j=>j.profileId===profileId).map(j=>j.url));const rows=normalizeExternalPostings(postings).filter(j=>{if(seen.has(j.url))return false;seen.add(j.url);return true;});if(!rows.length)return result({revision:state.revision,imported:0});const next=await store.mutate(expectedRevision,rows.map(j=>({type:'add-job',job:{...j,id:randomUUID(),profileId,createdAt:j.source.fetchedAt,alignment:'review',fit:'unknown',eligibility:'unknown',shortlisted:false}})));return result({revision:next.revision,imported:rows.length});}catch(e){return {...result({message:e instanceof Error?e.message:'Import failed.'}),isError:true};}
+ });
+ server.registerTool('save_recruiter_contacts',{description:'Save sourced public recruiter/hiring contacts gathered by the client. Requires evidence URLs and exact quotes. Current recruiting status is saved as unverified. Does not send messages or infer vacancy ownership.',inputSchema:{expectedRevision:z.number().int().nonnegative(),contacts:z.array(contactInputSchema).min(1).max(50)},annotations:{readOnlyHint:false,destructiveHint:false}},async({expectedRevision,contacts})=>{try{const next=await store.mutate(expectedRevision,contacts.map(contact=>({type:'save-contact',contact:{...contact,recruitingStatus:'unverified'}})));return result({revision:next.revision,contactIds:contacts.map(c=>c.id)});}catch(e){return {...result({message:e instanceof Error?e.message:'Contact import failed.'}),isError:true};}});
  return server;
 }

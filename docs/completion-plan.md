@@ -17,4 +17,18 @@ Inputs currently absent: compensation requirements, individual company tiers, ex
 
 Verification for pieces 1 and 3: scheduler lease/concurrency tests, failure retention, idempotent observations, due-only scans, profile filter tests, typecheck, production build, and local inbox UI. No sampled jobs were silently imported.
 
-All pieces are implemented for the local release. See release-verification.md for verification, actual target results, manual discovery boundaries and remaining client/hosting setup.
+The checked items above describe the first local release only. They do not imply completion of the expanded scope below. See release-verification.md for verification, actual target results, manual discovery boundaries and remaining client/hosting setup.
+
+## Expanded scope — 4 October 2026
+
+User requests recruiter lists only; message sending is excluded. Existing outreach records remain available but no sending integration will be built.
+
+- [x] Enterprise adapter implementations and expanded configured coverage. Workday, Oracle and remote feeds live verified; Workable normalization is fixture-tested, with no populated target board configured. Full company-universe coverage remains incomplete.
+- [x] Remote OK, Remotive, Arbeitnow and We Work Remotely feeds, explicit region diagnostics and stable source/URL deduplication. Different URLs for the same vacancy remain manual duplicate review.
+- [x] Major-provider search links and validated JSON/MCP intake with explicit connection status. Automatic authenticated discovery remains access-dependent and is not implemented.
+- [x] Sourced public hiring-contact list independent from jobs. Three leads recorded, with source age and unknown titles/status disclosed. No continuous LinkedIn recruiter crawler or verified active-hiring guarantee.
+- [x] Local text readability diagnostics, exact requirement comparison and editable evidence-grounded text drafts. Employer ATS scoring, OCR and visual parser compatibility are not claimed.
+- [x] MCP configuration registered and seven tools verified over SDK stdio. Active-client discovery awaits client reload.
+- [x] Local launchd startup service running; missing-source observations and durable daily/weekly digest queue implemented. SMTP delivery awaits recipient/account configuration and has not been live-tested.
+
+Email recipient and delivery account requested; not yet supplied. Country eligibility, recruiter ownership and résumé claims must never be guessed.

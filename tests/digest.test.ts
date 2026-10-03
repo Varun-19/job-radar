@@ -1,0 +1,9 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {buildDigest,digestPeriod} from '@jobradar/domain';
+import {workspaceSchema,radarSchema} from '@jobradar/contracts';
+const now=new Date('2026-10-04T05:00:00Z');
+const workspace=workspaceSchema.parse({revision:1,profiles:[{id:'staff',version:1,name:'Staff Frontend',roleFamilies:[],levels:[],keywords:[],locations:[],exclusions:[],discovery:{levelTerms:['staff'],roleTerms:['frontend'],locationTerms:['India'],excludedTitleTerms:[]}}],tiers:{staff:{preferred:'target',excluded:'excluded'}},jobs:[],resumes:[],evidence:[],contacts:[]});
+const row=(company:string,missingCount=0)=>({id:company,boardId:company,posting:{company,title:'Staff Frontend',location:'India Remote',description:'React',url:`https://example.com/${company}`,source:{provider:'greenhouse',board:company,postingId:company,fetchedAt:now.toISOString(),updatedAt:null}},version:1,firstSeenAt:now.toISOString(),lastSeenAt:now.toISOString(),changedAt:now.toISOString(),change:'new',missingCount});
+test('digests prioritize target companies, omit disappeared and excluded jobs, and disclose candidate uncertainty',()=>{const radar=radarSchema.parse({schedules:[],runs:[],inbox:[row('unknown'),row('preferred'),row('excluded'),row('missing',2)]});const digest=buildDigest(workspace,radar,'staff','daily',now)!;assert.equal(digest.count,2);assert.ok(digest.body.indexOf('preferred —')<digest.body.indexOf('unknown —'));assert.match(digest.body,/awaiting role-fit/);assert.doesNotMatch(digest.body,/missing —|excluded —/);assert.equal(buildDigest(workspace,radarSchema.parse({schedules:[],runs:[],inbox:[]}), 'staff','daily',now),null);});
+test('notification periods follow India dates and Monday weekly boundaries',()=>{assert.equal(digestPeriod(new Date('2026-10-03T20:00:00Z'),'daily'),'2026-10-04');assert.equal(digestPeriod(now,'weekly'),'2026-09-28');});

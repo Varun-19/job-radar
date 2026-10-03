@@ -7,3 +7,5 @@ export * from './opportunities';
 export * from './applications';
 export * from './postings';
 export * from './discovery-filter';
+export * from './resume-review';
+export * from './digest';
