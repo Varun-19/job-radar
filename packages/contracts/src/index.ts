@@ -5,3 +5,5 @@ export type HealthResponse = z.infer<typeof healthSchema>;
 
 export * from './workspace';
 export * from './tracking';
+
+export * from './discovery';

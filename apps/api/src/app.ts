@@ -1,8 +1,9 @@
+import { fetchBoard, DiscoveryFailure } from './discovery';
 import { randomUUID } from 'node:crypto';
 import { extractResume } from './resume-upload';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { healthSchema, mutationRequestSchema, resumeUploadSchema } from '@jobradar/contracts';
+import { healthSchema, mutationRequestSchema, resumeUploadSchema, discoveryRequestSchema } from '@jobradar/contracts';
 import { WorkspaceConflict, InvalidMutation, type WorkspaceStore } from '@jobradar/services';
 export function createApp(store?:WorkspaceStore) {
  const app=Fastify({logger:true,bodyLimit:6_000_000});
@@ -16,6 +17,11 @@ export function createApp(store?:WorkspaceStore) {
   if(!store)return reply.code(503).send({message:'Database is not configured.'});
   const parsed=mutationRequestSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Invalid workspace mutation.',issues:parsed.error.issues});
   try{return await store.mutate(parsed.data.expectedRevision,parsed.data.mutations);}catch(e){if(e instanceof WorkspaceConflict)return reply.code(409).send({message:e.message});if(e instanceof InvalidMutation)return reply.code(400).send({message:e.message});throw e;}
+ });
+ app.post('/discovery/preview',async(request,reply)=>{
+  if(request.headers.origin && request.headers.origin!==origin)return reply.code(403).send({message:'Origin not allowed.'});
+  const parsed=discoveryRequestSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Invalid board configuration.'});
+  try{return await fetchBoard(parsed.data.board);}catch(e){if(e instanceof DiscoveryFailure)return reply.code(502).send({message:e.message});throw e;}
  });
  app.post('/resumes/upload',async(request,reply)=>{
   if(request.headers.origin && request.headers.origin!==origin)return reply.code(403).send({message:'Origin not allowed.'});

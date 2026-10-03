@@ -4,7 +4,7 @@ import { initialProfiles, workspaceSchema, jobSchema, tierSchema, type Workspace
 import type { CompanyTier } from '@jobradar/domain';
 interface Workspace extends WorkspaceSnapshot { profile:string; sorts:Record<string,string> }
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const empty:Workspace={revision:0,profiles:initialProfiles,tiers:{},jobs:[],resumes:[],evidence:[],applications:[],activities:[],profile:'staff',sorts:{}};
+const empty:Workspace={revision:0,boards:[],profiles:initialProfiles,tiers:{},jobs:[],resumes:[],evidence:[],applications:[],activities:[],profile:'staff',sorts:{}};
 async function request(path:string,options?:RequestInit):Promise<WorkspaceSnapshot> {const response=await fetch(`${api}${path}`,options);if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.message??`Backend request failed (${response.status}).`);}return workspaceSchema.parse(await response.json());}
 export function useWorkspace() {
  const [data,setData]=useState<Workspace>(empty); const state=useRef(data);

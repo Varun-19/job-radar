@@ -10,3 +10,5 @@ export const activities = pgTable('workspace_activities',{id:uuid('id').primaryK
 export const resumes = pgTable('resume_versions',{id:text('id').primaryKey(),seriesKey:text('series_key').notNull(),version:integer('version').notNull(),metadata:jsonb('metadata').$type<WorkspaceSnapshot['resumes'][number]>().notNull(),originalBase64:text('original_base64').notNull()});
 export const evidence = pgTable('candidate_evidence',{id:text('id').primaryKey(),resumeVersionId:text('resume_version_id').references(()=>resumes.id),data:jsonb('data').$type<WorkspaceSnapshot['evidence'][number]>().notNull()});
 export const applications = pgTable('applications',{id:text('id').primaryKey(),jobId:text('job_id').notNull().unique().references(()=>jobs.id),resumeVersionId:text('resume_version_id').references(()=>resumes.id),data:jsonb('data').$type<WorkspaceSnapshot['applications'][number]>().notNull()});
+
+export const boards=pgTable('job_boards',{id:text('id').primaryKey(),data:jsonb('data').$type<WorkspaceSnapshot['boards'][number]>().notNull()});

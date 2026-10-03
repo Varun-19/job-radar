@@ -14,7 +14,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -54,6 +54,16 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
    assert.equal(snapshot.activities.filter(a=>a.type==='create-application'||a.type==='update-application').length,2);
    assert.equal((await store.resumeFile!(resumeId))?.base64,Buffer.from('Led a frontend platform migration.').toString('base64'));
 
+   snapshot=await store.mutate(snapshot.revision,[{type:'save-board',board:{id:'fixture-board',company:'Test Co',provider:'greenhouse',token:'fixture'}}]);
+   assert.equal(snapshot.boards.find(b=>b.id==='fixture-board')?.token,'fixture');
+   const sourced={...job,id:randomUUID(),alignment:'review' as const,eligibility:'unknown' as const,source:{provider:'greenhouse' as const,board:'fixture',postingId:'123',fetchedAt:new Date().toISOString(),updatedAt:null}};
+   snapshot=await store.mutate(snapshot.revision,[{type:'add-job',job:sourced}]);
+   await assert.rejects(store.mutate(snapshot.revision,[{type:'add-job',job:{...sourced,id:randomUUID()}}]),InvalidMutation);
+   snapshot=await store.mutate(snapshot.revision,[{type:'add-job',job:{...sourced,id:randomUUID(),profileId:'staff'}}]);
+   snapshot=await store.mutate(snapshot.revision,[{type:'assess-job',id:sourced.id,alignment:'primary',fit:'partial',eligibility:'confirmed'}]);
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.source?.postingId,'123');
+   assert.equal(snapshot.jobs.find(j=>j.id===sourced.id)?.alignment,'primary');
+   assert.equal(snapshot.activities.filter(a=>a.type==='assess-job').length,1);
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
  }finally{await admin.unsafe(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();}
 });

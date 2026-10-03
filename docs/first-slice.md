@@ -39,3 +39,9 @@ Résumé import and manual application tracking are now implemented, superseding
 Evidence is manually reviewed. Résumé evidence requires an exact source version and a quote present in the extracted text. Applications retain a selected résumé version, explicit or unknown submission date, follow-up date, stage, and append-only notes. Backward/reopened transitions and post-preparation résumé/date corrections require an explanation. Today uses actual saved records and India-time follow-ups.
 
 Validation covers local PDF/text extraction, invalid inputs, immutable versions and original byte retrieval, evidence provenance, application uniqueness, correction invariants, transaction rollback, and unknown dates. Live sources, semantic interpretation, MCP, and recruiter/outreach workflows remain deferred.
+
+## On-demand live discovery increment
+
+Live board discovery is now available for Greenhouse, Lever, and Lever EU, superseding the blanket live-source deferral above. Saved company boards are shared across search profiles. The UI fetches a snapshot, filters titles and locations, and explicitly imports selected postings with provenance. Duplicate imports are rejected for a profile; other profiles may import the same source identity. Imports begin in Needs review with unknown fit/eligibility. Manual assessment editing is available in the job detail.
+
+Tests cover provider payload normalization, encoded descriptions, prospect-post exclusion, source timestamp preservation, source URL validation, request host construction, upstream failures, origin/input rejection, board persistence, duplicate import rejection, cross-profile imports, and assessment history. Datadog’s live public board was also fetched without importing jobs. Scheduled discovery, broad company-board mapping, posting revisions/closure, AI interpretation, MCP, and recruiter outreach remain deferred.

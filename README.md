@@ -1,6 +1,6 @@
 # job-radar
 
-The UI, API, and shared services support PostgreSQL-backed job drafts, company preferences, versioned search profiles, immutable résumé versions, reviewed professional evidence, and manual application tracking. Today shows saved records and due follow-ups. Live job discovery, recruiter workflows, outreach delivery, and AI analysis remain pending.
+The UI, API, and shared services support PostgreSQL-backed job drafts, company preferences, versioned search profiles, immutable résumé versions, reviewed professional evidence, and manual application tracking. Today shows saved records and due follow-ups. On-demand discovery from configurable Greenhouse and Lever company boards is available. Scheduled discovery, recruiter workflows, outreach delivery, and AI analysis remain pending.
 
 ## Start
 
@@ -94,4 +94,14 @@ At `/evidence`, upload a readable PDF, TXT, or Markdown résumé (up to 4 MB), o
 
 At `/applications`, track a saved opportunity, stage, exact résumé version, actual submission date when known, follow-up date, and notes. Unknown dates remain unknown. Reopening, moving backwards, or correcting a résumé/submission date after preparation requires an explanation. Updates append activity history and do not send applications or messages. Today surfaces due follow-ups using India time.
 
-Run `npm run db:migrate` for the additive tracking migration before using these screens. Résumé interpretation, evidence-based job suggestions, and live discovery are not implemented yet.
+Run `npm run db:migrate` for the additive tracking migration before using these screens. Résumé interpretation and evidence-based job suggestions are not implemented yet.
+
+## Live discovery
+
+In `/opportunities`, choose **Discover live jobs**. A verified Datadog Greenhouse board is seeded; add other company tokens from their public Greenhouse or Lever board URLs (including Lever EU). Boards persist in PostgreSQL. Fetching is read-only and never imports automatically. Filter titles and locations with comma-separated terms, then save selected postings into the active profile’s Needs review queue. The same process supports Staff, SAP, or other role searches.
+
+Provider, board token, posting ID, retrieval time, and available source update time persist with each imported posting. Imports keep fit and eligibility unknown. Duplicate source postings are rejected within the same profile, while different profiles can review them independently. Use **Save assessment** in the job detail to record your review; company tiers keep relevant target companies first. The imported timestamp is not a publication date.
+
+This increment covers manually initiated board snapshots, with 20-second requests, fixed provider hosts, no redirects, and bounded response sizes. It does not cover the entire company universe, arbitrary career websites, LinkedIn, scheduled scans, posting revision refresh, or closure inference. A failed fetch leaves existing jobs unchanged.
+
+Adapter references: [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html), [Lever Postings API](https://github.com/lever/postings-api).
