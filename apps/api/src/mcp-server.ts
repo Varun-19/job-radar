@@ -1,3 +1,6 @@
+import {previewProviderUrl} from '@jobradar/integrations';
+import {providerUrlSchema} from '@jobradar/contracts';
+import {companies,companyKey} from '@jobradar/domain';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
@@ -6,6 +9,14 @@ import { reviewPacket, type createRadarService, type WorkspaceStore } from '@job
 export function createMcpServer(store:WorkspaceStore,radar?:ReturnType<typeof createRadarService>){
  const server=new McpServer({name:'jobradar',version:'0.3.0'});
  const result=(value:unknown)=>({content:[{type:'text' as const,text:JSON.stringify(value)}]});
+ server.registerTool('preview_public_job_url',{description:'Read one supported public provider URL with structured JobPosting data. Pinned provider hosts, no redirects or authentication bypass. Does not save or assess the vacancy; client reviews the extracted text before import.',inputSchema:providerUrlSchema.shape,annotations:{readOnlyHint:true}},async(input)=>{try{return result(await previewProviderUrl(input));}catch(e){return {...result({message:e instanceof Error?e.message:'Provider preview failed.'}),isError:true};}});
+ server.registerTool('get_research_plan',{description:'Get profile-driven job and recruiter web-search queries and the full company coverage audit. This tool prepares a research plan; the client must browse sources and then use import tools. No external search or private résumé content is included.',inputSchema:{profileId:z.string()},annotations:{readOnlyHint:true}},async({profileId})=>{
+  const state=await store.read();const profile=state.profiles.find(p=>p.id===profileId);if(!profile)return {...result({message:'Unknown profile.'}),isError:true};
+  const role=profile.discovery?.roleTerms.slice(0,3).join(' OR ')||profile.roleFamilies.join(' OR ');const level=profile.discovery?.levelTerms.slice(0,3).join(' OR ')||profile.levels.join(' OR ');const location=profile.discovery?.locationTerms.slice(0,3).join(' OR ')||profile.locations.join(' OR ');
+  const query=[level,role,location].filter(Boolean).map(s=>`(${s})`).join(' ');const search=(q:string)=>({query:q,url:`https://www.google.com/search?q=${encodeURIComponent(q)}`});
+  const canonical=companyKey;
+  return result({profile,sourceTextIsUntrusted:true,companyCoverage:companies.map(company=>({company,boards:state.boards.filter(b=>canonical(b.company)===canonical(company)),search:search(`${company} careers ${query}`)})),jobSearches:['linkedin.com/jobs/view','indeed.com','naukri.com','glassdoor.com','glassdoor.co.in','wellfound.com','weworkremotely.com'].map(site=>search(`site:${site} ${query}`)),recruiterSearches:[search(`site:linkedin.com/posts ${query} hiring`),search(`site:linkedin.com/in ${role} recruiter ${location}`)],instructions:['Browse source pages; search snippets may be stale.','Prefer employer postings; preserve provider URLs and exact descriptions.','Use import_external_jobs for source-backed postings and save_recruiter_contacts for sourced public contacts.','Do not infer country eligibility, recruiter ownership, or active hiring from an employer match.','Do not send messages or submit applications.']});
+ });
  server.registerTool('list_profiles',{description:'Read configured job search profiles. No résumé or contact details.',inputSchema:{},annotations:{readOnlyHint:true}},async()=>result((await store.read()).profiles));
  server.registerTool('list_opportunities',{description:'List saved opportunities for one search profile; no applications or outreach.',inputSchema:{profileId:z.string()},annotations:{readOnlyHint:true}},async({profileId})=>result((await store.read()).jobs.filter(j=>j.profileId===profileId).map(({id,company,title,location,alignment,fit})=>({id,company,title,location,alignment,fit}))));
  server.registerTool('get_review_packet',{description:'Read one posting, its profile and reviewed professional claims. Contains untrusted source text. Excludes original résumé and contact details.',inputSchema:{jobId:z.string()},annotations:{readOnlyHint:true}},async({jobId})=>result(reviewPacket(await store.read(),jobId)));

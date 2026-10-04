@@ -59,3 +59,18 @@ Outstanding access-dependent work: automatic LinkedIn/Indeed/Naukri/Glassdoor/We
 Reviewed the worker, source inventory reads, digest filtering, notification queue, and MCP boundaries. Fixed two notification correctness issues: digests previously inherited the UI's 1,000-posting cap before profile filtering, and pending digest bodies could freeze before later scans finished. Notification input now includes the full inventory; queued bodies refresh only while pending. Sending and sent records remain unchanged.
 
 The isolated PostgreSQL regression includes 1,001 newer unrelated postings hiding a relevant role from the UI-sized inventory, verifies that the digest still includes that role, and checks pending refresh plus sent-body immutability. SMTP delivery still requires configuration and live verification; this regression does not claim email delivery was tested.
+
+## Remaining-scope release — 4 October 2026
+
+- 40 configured company boards and four remote feeds. Added 21 live-verified company sources through migrations 0014–0016. SmartRecruiters ServiceNow/Canva and Workday Adobe scans are query-limited to frontend. Full historical-universe automatic coverage remains incomplete. Source response cap is 24 MB; location lists retain up to 5,000 characters.
+- Seven saved target opportunities: Sarvam AI, GitLab, Okta, FurtherAI, Acceldata, Zscaler (Browser Extension/React), and Noon (hands-on Staff Frontend). The latter three have pending evidence-grounded partial-fit proposals; accepted fit, eligibility and readiness remain unchanged.
+- Five sourced hiring contacts. New Deepanshi Verma and Ashwin narayan leads preserve exact public quotes, historical/source-age caveats and unverified current status. No messages sent.
+- Public provider URL preview has pinned hosts, no redirects, no authentication bypass and reviewed import. Fixture extraction tests pass. Live Indeed access returned HTTP 401; browser verification showed the failure and seven saved jobs remained unchanged. This is not automatic provider search.
+- PDF diagnostics verified against both supplied pages: text is extractable, dimensions are 458 × 649 points. Both pages were visually inspected; education and role/date clarity need review. Original bytes were preserved. Private review notes remain ignored. No employer-specific ATS compatibility score is claimed.
+- Nine MCP tools verified using the SDK stdio client with seven opportunities and eight reviewed claims. Research plan covers the complete company universe. Active-client loading still requires reload.
+- SMTP connection/authentication test sends no mail. Controlled failed-message retry requires explicit non-delivery confirmation. Missing credentials were verified in the UI; live delivery remains untested.
+- Historical company aliases preserve company coverage and tier preferences. Explicit per-name tiers take precedence when existing aliases conflict.
+- Production build, all workspace type checks, 44 regular tests plus one isolated DB test passed. One DB test is intentionally skipped in the regular suite and run separately.
+- Expanded backup was restored into a disposable database: 16 migrations, seven jobs, five contacts and eight professional evidence records matched the original. Only the disposable verification database was removed.
+
+Outstanding: authenticated/background discovery for major providers, additional company-source resolution, continuous recruiter research beyond the assisted workflow, SMTP recipient/account configuration and real delivery verification, and active-chat MCP reload. Plugin discovery did not return a ready-to-use job-search connector for the requested providers.

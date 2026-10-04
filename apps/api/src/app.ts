@@ -5,6 +5,9 @@ import { z } from 'zod';
 import { scheduleInputSchema } from '@jobradar/contracts';
 import { ScanBusy, type createNotificationService, type createRadarService } from '@jobradar/services';
 import { randomUUID } from 'node:crypto';
+import {previewProviderUrl} from '@jobradar/integrations';
+import {providerUrlSchema} from '@jobradar/contracts';
+import {documentDiagnostics} from './resume-diagnostics';
 import { extractResume } from './resume-upload';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
@@ -17,6 +20,8 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
  app.addHook('onRequest',async(request,reply)=>{if(!allowedRequestHost(request.headers.host)||(request.headers.origin&&request.headers.origin!==origin))return reply.code(403).send({message:'Local workspace access only.'});});
  app.get('/health',async (_request,reply)=>{let database:'connected'|'unavailable'|'not-configured'=store?'connected':'not-configured';if(store)try{await store.read();}catch{database='unavailable';reply.code(503);}return healthSchema.parse({status:database==='unavailable'?'degraded':'ok',service:'jobradar-api',version:'0.2.0',database});});
  app.get('/connections',async()=>({mcp:await readFile(new URL('../../../.local/mcp-registration.json',import.meta.url),'utf8').then(()=> 'Registration recorded; reload client to activate').catch(()=> 'Registration not recorded'),emailConfigured:!!(process.env.SMTP_HOST&&process.env.SMTP_FROM&&process.env.JOBRADAR_ALERT_EMAIL),providers:{linkedin:'assisted intake',indeed:'assisted intake',naukri:'assisted intake',glassdoor:'assisted intake',wellfound:'assisted intake',weworkremotely:'public RSS feed + assisted intake'},notificationHistory:notifications?await notifications.read():[]}));
+ app.post('/notifications/verify',async(_request,reply)=>{if(!notifications)return reply.code(503).send({message:'Notifications unavailable.'});try{return await notifications.verify();}catch(e){return reply.code(400).send({message:e instanceof Error?e.message:'Invalid SMTP configuration.'});}});
+ app.post('/notifications/retry',async(request,reply)=>{if(!notifications)return reply.code(503).send({message:'Notifications unavailable.'});const parsed=z.object({id:z.string().regex(/^[a-f0-9]{64}$/),providerDeliveryConfirmedAbsent:z.literal(true)}).safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Confirm with your email provider that the failed message was not delivered before retrying.'});const result=await notifications.retry(parsed.data.id);return result.requeued?result:reply.code(409).send({message:'Only failed messages can be retried.'});});
  app.get('/workspace',async (_request,reply)=>{if(!store)return reply.code(503).send({message:'Database is not configured.'});return store.read();});
  app.post('/workspace/mutations',async(request,reply)=>{
   // CORS alone does not block writes from another origin.
@@ -38,6 +43,10 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
   const parsed=z.object({boardId:z.string().min(1).max(100),profileId:z.string().max(100).optional()}).safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Choose a company board.'});
   try{await radar.scan(parsed.data.boardId);return await radar.read(parsed.data.profileId);}catch(e){return reply.code(e instanceof ScanBusy?409:502).send({message:e instanceof Error?e.message:'Scan failed.'});}
  });
+ app.post('/discovery/url-preview',async(request,reply)=>{
+  const parsed=providerUrlSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Use a supported provider URL.'});
+  try{return await previewProviderUrl(parsed.data);}catch(e){return reply.code(502).send({message:e instanceof Error?e.message:'Provider unavailable.'});}
+ });
  app.post('/discovery/preview',async(request,reply)=>{
   if(request.headers.origin && request.headers.origin!==origin)return reply.code(403).send({message:'Origin not allowed.'});
   const parsed=discoveryRequestSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Invalid board configuration.'});
@@ -49,6 +58,11 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
   const parsed=resumeUploadSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({message:'Invalid résumé upload.'});
   try{const {filename,label,base64,expectedRevision}=parsed.data;const extracted=await extractResume(filename,base64);return await store.mutate(expectedRevision,[{type:'add-resume',id:randomUUID(),filename,label,...extracted}]);}
   catch(e){if(e instanceof InvalidMutation)return reply.code(400).send({message:e.message});if(e instanceof WorkspaceConflict)return reply.code(409).send({message:e.message});throw e;}
+ });
+ app.get<{Params:{id:string}}>('/resumes/:id/diagnostics',async(request,reply)=>{
+  const file=await store?.resumeFile?.(request.params.id);if(!file)return reply.code(404).send({message:'Résumé not found.'});
+  const resume=(await store!.read()).resumes.find(r=>r.id===request.params.id);if(!resume)return reply.code(404).send({message:'Résumé not found.'});
+  try{return await documentDiagnostics(file.metadata.mediaType,file.base64,resume.text);}catch{return reply.code(422).send({message:'Document diagnostics could not read this file. Inspect the original PDF manually.'});}
  });
  app.get<{Params:{id:string}}>('/resumes/:id/download',async(request,reply)=>{
   const file=await store?.resumeFile?.(request.params.id);if(!file)return reply.code(404).send({message:'Résumé not found.'});

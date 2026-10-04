@@ -116,4 +116,4 @@ For a previously saved posting, **Update saved posting** or **Record latest chec
 
 Migration 0004 preserves an initial version of existing imported postings and adds four verified starter boards without changing company tiers or importing jobs. Scheduled scans and coverage beyond these configured providers remain pending.
 
-The expanded local release adds recruiter-list discovery, résumé text/ATS diagnostics and evidence-grounded drafts, seven MCP tools, login startup and daily/weekly email outbox preparation. SMTP delivery needs local account configuration. Open `/connections` for honest source and delivery coverage.
+The expanded local release adds recruiter-list discovery, résumé text/ATS diagnostics and evidence-grounded drafts, nine MCP tools, login startup and daily/weekly email outbox preparation. SMTP delivery needs local account configuration. Open `/connections` for honest source and delivery coverage.

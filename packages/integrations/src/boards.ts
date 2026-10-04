@@ -17,17 +17,18 @@ export async function readText(url:string,fetcher:typeof fetch,signal:AbortSigna
  if(!response.ok)throw new DiscoveryFailure(`Source returned HTTP ${response.status}. Existing observations are retained.`);
  const reader=response.body?.getReader();if(!reader)throw new DiscoveryFailure('Source returned no response body.');
  const chunks:Uint8Array[]=[];let size=0;
- try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>12_000_000)throw new DiscoveryFailure('Source response exceeds 12 MB.');chunks.push(value);}}finally{await reader.cancel();}
+ try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>24_000_000)throw new DiscoveryFailure('Source response exceeds 24 MB.');chunks.push(value);}}finally{await reader.cancel();}
  return Buffer.concat(chunks).toString('utf8');
 }
 export async function readJson(url:string,fetcher:typeof fetch,signal:AbortSignal,body?:unknown):Promise<any>{return JSON.parse(await readText(url,fetcher,signal,body));}
 export async function fetchBoard(input:JobBoard,fetcher:typeof fetch=fetch){
  const board=boardSchema.parse(input);const signal=AbortSignal.timeout(180000);
  try{
-  if(['workday','oracle','workable','remoteok','remotive','arbeitnow','weworkremotely'].includes(board.provider))return await fetchExtended(board,fetcher,signal);
+  if(['workday','oracle','smartrecruiters','workable','remoteok','remotive','arbeitnow','weworkremotely'].includes(board.provider))return await fetchExtended(board,fetcher,signal);
   const url=board.provider==='ashby'?`https://api.ashbyhq.com/posting-api/job-board/${board.token}`:board.provider==='greenhouse'?`https://boards-api.greenhouse.io/v1/boards/${board.token}/jobs?content=true`:`https://${board.provider==='lever-eu'?'api.eu.lever.co':'api.lever.co'}/v0/postings/${board.token}?mode=json`;
   const payload=await readJson(url,fetcher,AbortSignal.any([signal,AbortSignal.timeout(20000)]));
   const fetchedAt=new Date().toISOString();return {jobs:normalizeBoard(board,payload,fetchedAt),fetchedAt};
  }catch(e){if(e instanceof DiscoveryFailure)throw e;throw new DiscoveryFailure('Could not read the complete source: timeout, network failure, or unsupported response. Existing records remain unchanged.');}
 }
 import { fetchExtended } from './extended-boards';
+export {previewProviderUrl,structuredPosting} from './provider-url';

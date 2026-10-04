@@ -32,3 +32,16 @@ User requests recruiter lists only; message sending is excluded. Existing outrea
 - [x] Local launchd startup service running; missing-source observations and durable daily/weekly digest queue implemented. SMTP delivery awaits recipient/account configuration and has not been live-tested.
 
 Email recipient and delivery account requested; not yet supplied. Country eligibility, recruiter ownership and résumé claims must never be guessed.
+
+## Remaining-scope implementation and access audit
+
+- [x] Add live-verified company sources and SmartRecruiters pagination/full-description support. More target sources remain to be resolved; the full universe is not automatically scanned.
+- [x] Public provider URL preview with explicit extraction review, pinned hosts, regional India domains and blocked-access fallback. This is not background discovery from major providers.
+- [x] Profile-driven MCP research plan covering company universe, jobs and recruiters, without raw résumé exposure or paid search/model adapters.
+- [x] PDF structure diagnostics and complete visual review of both supplied résumé pages. Employer ATS compatibility cannot be guaranteed.
+- [x] Add sourced hiring leads with current-status uncertainty and source age disclosed. Continuous recruiter discovery remains assisted through the client.
+- [x] SMTP connection test and controlled recovery of failed messages. Actual recipient delivery requires account configuration.
+- [ ] Resolve remaining company-board providers and configure verified sources.
+- [ ] Authenticated/background major-provider discovery: no suitable connected provider search integration is available; live Indeed public access returned HTTP 401.
+- [ ] Live SMTP delivery: recipient/account requested; no details supplied yet.
+- [ ] Active-chat MCP tool discovery after client reload; SDK protocol verification is complete.

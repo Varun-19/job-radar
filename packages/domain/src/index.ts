@@ -9,3 +9,4 @@ export * from './postings';
 export * from './discovery-filter';
 export * from './resume-review';
 export * from './digest';
+export * from './company-universe';

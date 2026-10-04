@@ -1,4 +1,5 @@
 'use client';
+import {companyTier} from '@jobradar/domain';
 import { useEffect, useRef, useState } from 'react';
 import { initialProfiles, workspaceSchema, jobSchema, tierSchema, type WorkspaceSnapshot, type WorkspaceMutation, type SearchProfile } from '@jobradar/contracts';
 import type { CompanyTier } from '@jobradar/domain';
@@ -26,7 +27,7 @@ export function useWorkspace() {
   if(next.profile!==old.profile||next.sorts!==old.sorts){apply({...old,profile:next.profile,sorts:next.sorts});persistView(next.profile,next.sorts);}
   return mutations.length?mutate(mutations):Promise.resolve(true);
  }
- const tierOf=(company:string):CompanyTier=>data.tiers[data.profile]?.[company.trim().toLowerCase()]??'unclassified';
+ const tierOf=(company:string):CompanyTier=>companyTier(data.tiers[data.profile],company);
  const setTier=(company:string,tier:CompanyTier)=>mutate([{type:'set-tier',profileId:data.profile,company,tier}]);
  const saveProfile=(profile:SearchProfile)=>mutate([{type:'save-profile',profile}]);
  async function uploadResume(file:File,label:string){

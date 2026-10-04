@@ -17,7 +17,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts','0010_source_presence','0011_notifications','0012_extended_sources','0013_additional_sources'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts','0010_source_presence','0011_notifications','0012_extended_sources','0013_additional_sources','0014_company_coverage','0015_noon_source','0016_razorpay_source'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -148,7 +148,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
     assert.equal((await radar.read()).inbox.some(row=>row.posting.title==='Staff Frontend Engineer'),false);
     const notificationInput=await radar.readForNotifications();assert.equal(notificationInput.truncated,false);assert.equal(notificationInput.inbox.length,1002);
     assert.equal(buildDigest(snapshot,notificationInput,profile.id,'daily')?.count,1);
-    const directory=await mkdtemp(join(tmpdir(),'jobradar-notification-test-'));const notifications=createNotificationService(isolated.toString(),directory);try{const now=new Date();now.setUTCHours(5,0,0,0);await notifications.queue(snapshot,await radar.readForNotifications(),now);await notifications.queue(snapshot,await radar.readForNotifications(),now);const deliveries=await notifications.read();assert.equal(deliveries.filter(row=>row.profileId===profile.id&&row.kind==='daily').length,1);assert.deepEqual(await notifications.deliver({}),{configured:false,sent:0});assert.ok(deliveries.every(row=>row.status==='pending'));
+    const directory=await mkdtemp(join(tmpdir(),'jobradar-notification-test-'));const notifications=createNotificationService(isolated.toString(),directory);try{const now=new Date();now.setUTCHours(5,0,0,0);await notifications.queue(snapshot,await radar.readForNotifications(),now);await notifications.queue(snapshot,await radar.readForNotifications(),now);const deliveries=await notifications.read();assert.equal(deliveries.filter(row=>row.profileId===profile.id&&row.kind==='daily').length,1);assert.deepEqual(await notifications.deliver({}),{configured:false,sent:0});assert.equal((await notifications.verify({})).verified,false);await assert.rejects(notifications.verify({SMTP_HOST:'example.com',SMTP_FROM:'from@example.com',JOBRADAR_ALERT_EMAIL:'to@example.com',SMTP_USER:'user'}),/both SMTP/);assert.ok(deliveries.every(row=>row.status==='pending'));
      // Unsent digests refresh as additional sources finish; sent digests stay immutable.
      const original=notificationInput.inbox.find(row=>row.posting.title==='Staff Frontend Engineer')!;
      const expanded={...notificationInput,inbox:[...notificationInput.inbox,{...original,id:'second-role',posting:{...original.posting,url:'https://example.com/second-role'}}]};
@@ -156,7 +156,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
      const [updated]=await sql`SELECT id,body FROM notification_outbox WHERE profile_id=${profile.id} AND kind='daily'`;assert.match(updated.body,/Showing 2 of 2/);
      await sql`UPDATE notification_outbox SET status='sent',sent_at=now() WHERE id=${updated.id}`;
      await notifications.queue(snapshot,notificationInput,now);
-     const [sent]=await sql`SELECT body FROM notification_outbox WHERE id=${updated.id}`;assert.equal(sent.body,updated.body);}finally{await notifications.close();await rm(directory,{recursive:true,force:true});}
+     const [sent]=await sql`SELECT body FROM notification_outbox WHERE id=${updated.id}`;assert.equal(sent.body,updated.body);assert.equal((await notifications.retry(updated.id)).requeued,false);await sql`UPDATE notification_outbox SET status='failed' WHERE id=${updated.id}`;assert.equal((await notifications.retry(updated.id)).requeued,true);assert.equal((await notifications.retry(updated.id)).requeued,false);}finally{await notifications.close();await rm(directory,{recursive:true,force:true});}
 
    }finally{await radar.close();}
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
