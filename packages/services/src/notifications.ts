@@ -13,7 +13,8 @@ export function createNotificationService(url:string,outboxDirectory:string){
    if(kind==='weekly'&&now.toLocaleDateString('en-US',{timeZone:'Asia/Kolkata',weekday:'short'})!=='Mon')continue;
    const digest=buildDigest(workspace,radar,profile.id,kind,now);if(!digest)continue;
    const period=digestPeriod(now,kind);const id=createHash('sha256').update(`${profile.id}:${kind}:${period}`).digest('hex');
-   await sql`INSERT INTO notification_outbox(id,profile_id,kind,period,subject,body) VALUES (${id},${profile.id},${kind},${period},${digest.subject},${digest.body}) ON CONFLICT DO NOTHING`;
+   // Refresh unsent snapshots as scans finish without modifying claimed or delivered mail.
+   await sql`INSERT INTO notification_outbox(id,profile_id,kind,period,subject,body) VALUES (${id},${profile.id},${kind},${period},${digest.subject},${digest.body}) ON CONFLICT (id) DO UPDATE SET subject=excluded.subject,body=excluded.body WHERE notification_outbox.status='pending'`;
   }
   await mkdir(outboxDirectory,{recursive:true,mode:0o700});
   const rows=await sql`SELECT id,subject,body,status FROM notification_outbox WHERE status!='sent' ORDER BY created_at DESC LIMIT 100`;

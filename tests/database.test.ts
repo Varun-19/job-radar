@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
+import {buildDigest} from '@jobradar/domain';
 import { createWorkspaceStore, WorkspaceConflict, InvalidMutation, createRadarService, createNotificationService, ScanBusy } from '@jobradar/services';
 
 test('PostgreSQL persists workspace changes, versions profiles, and rejects stale writes atomically', {skip:process.env.RUN_DB_TESTS!=='1'}, async()=>{
@@ -140,7 +141,22 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
     snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile:{...snapshot.profiles.find(p=>p.id===profile.id)!,discovery:{levelTerms:['Staff'],roleTerms:['frontend'],locationTerms:['Bengaluru'],excludedTitleTerms:[]}}}]);
     assert.equal((await radar.read(profile.id)).inbox.length,1);assert.equal((await radar.read('staff')).inbox.length,0);
     const count=state.runs.length;await radar.tick();assert.equal((await radar.read()).runs.length,count);
-    const directory=await mkdtemp(join(tmpdir(),'jobradar-notification-test-'));const notifications=createNotificationService(isolated.toString(),directory);try{const now=new Date();now.setUTCHours(5,0,0,0);await notifications.queue(snapshot,await radar.read(),now);await notifications.queue(snapshot,await radar.read(),now);const deliveries=await notifications.read();assert.equal(deliveries.filter(row=>row.profileId===profile.id&&row.kind==='daily').length,1);assert.deepEqual(await notifications.deliver({}),{configured:false,sent:0});assert.ok(deliveries.every(row=>row.status==='pending'));}finally{await notifications.close();await rm(directory,{recursive:true,force:true});}
+    // An unrelated, newer board must not hide matching roles from notification input.
+    const newer=new Date(Date.now()+1000).toISOString();
+    const unrelated=Array.from({length:1001},(_,i)=>({id:`unrelated-${i}`,postingId:`unrelated-${i}`,posting:{...fixturePosting,title:'Backend Engineer',url:`https://example.com/backend/${i}`}}));
+    await sql`INSERT INTO discovery_inbox ${sql(unrelated.map(row=>({id:row.id,board_id:'fixture-board',posting_id:row.postingId,posting:sql.json(row.posting),version:1,first_seen_at:newer,last_seen_at:newer,changed_at:newer,change:'new'})))}`;
+    assert.equal((await radar.read()).inbox.some(row=>row.posting.title==='Staff Frontend Engineer'),false);
+    const notificationInput=await radar.readForNotifications();assert.equal(notificationInput.truncated,false);assert.equal(notificationInput.inbox.length,1002);
+    assert.equal(buildDigest(snapshot,notificationInput,profile.id,'daily')?.count,1);
+    const directory=await mkdtemp(join(tmpdir(),'jobradar-notification-test-'));const notifications=createNotificationService(isolated.toString(),directory);try{const now=new Date();now.setUTCHours(5,0,0,0);await notifications.queue(snapshot,await radar.readForNotifications(),now);await notifications.queue(snapshot,await radar.readForNotifications(),now);const deliveries=await notifications.read();assert.equal(deliveries.filter(row=>row.profileId===profile.id&&row.kind==='daily').length,1);assert.deepEqual(await notifications.deliver({}),{configured:false,sent:0});assert.ok(deliveries.every(row=>row.status==='pending'));
+     // Unsent digests refresh as additional sources finish; sent digests stay immutable.
+     const original=notificationInput.inbox.find(row=>row.posting.title==='Staff Frontend Engineer')!;
+     const expanded={...notificationInput,inbox:[...notificationInput.inbox,{...original,id:'second-role',posting:{...original.posting,url:'https://example.com/second-role'}}]};
+     await notifications.queue(snapshot,expanded,now);
+     const [updated]=await sql`SELECT id,body FROM notification_outbox WHERE profile_id=${profile.id} AND kind='daily'`;assert.match(updated.body,/Showing 2 of 2/);
+     await sql`UPDATE notification_outbox SET status='sent',sent_at=now() WHERE id=${updated.id}`;
+     await notifications.queue(snapshot,notificationInput,now);
+     const [sent]=await sql`SELECT body FROM notification_outbox WHERE id=${updated.id}`;assert.equal(sent.body,updated.body);}finally{await notifications.close();await rm(directory,{recursive:true,force:true});}
 
    }finally{await radar.close();}
   }finally{if(store){await store.close();store=undefined;}await sql.end();}

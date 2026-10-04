@@ -53,3 +53,9 @@ Browser checks: Connections coverage/status; résumé diagnostics and GitLab com
 Local MCP registered in Codex config with existing settings preserved and a backup. Active client tool discovery requires reload and remains unverified in this turn. `com.varun.jobradar` launchd service installed, loaded and verified serving the local production app/API/worker; database startup no longer depends on an interactive-shell-only rg binary. Scans pause while the laptop sleeps or is off. A private backup retains the expanded workspace and migrations.
 
 Outstanding access-dependent work: automatic LinkedIn/Indeed/Naukri/Glassdoor/Wellfound discovery has no usable authenticated connector here; search/import remains assisted. The full target-company universe is not monitored. No external search MCP or paid aggregator was installed. SMTP alerts/digests have a tested queue and TLS transport implementation, but await recipient/account settings and a real delivery test. Oracle summaries require full-posting inspection, and résumé diagnostics do not promise employer ATS compatibility or OCR.
+
+## Follow-up review — 4 October 2026
+
+Reviewed the worker, source inventory reads, digest filtering, notification queue, and MCP boundaries. Fixed two notification correctness issues: digests previously inherited the UI's 1,000-posting cap before profile filtering, and pending digest bodies could freeze before later scans finished. Notification input now includes the full inventory; queued bodies refresh only while pending. Sending and sent records remain unchanged.
+
+The isolated PostgreSQL regression includes 1,001 newer unrelated postings hiding a relevant role from the UI-sized inventory, verifies that the digest still includes that role, and checks pending refresh plus sent-body immutability. SMTP delivery still requires configuration and live verification; this regression does not claim email delivery was tested.
