@@ -46,3 +46,9 @@ Job cards now display readable provider names (including LinkedIn when it is the
 Selected-job details show source facts and hiring contacts. Only explicit job associations are labelled vacancy-linked. Exact company aliases can supply company contacts, whose vacancy ownership remains unverified. Contact details include title, recorded recruiting status, evidence date, profile/evidence links, source quotes and notes. The UI does not invent recruiter ownership, dates or provider coverage. A domain test verifies direct associations, canonical company matches and exclusion of similarly named unrelated employers.
 
 Verification: 60 unit tests pass, typecheck and production build pass. Mobile selection/back and the real Palo Alto Networks company-contact display were checked without changing any workspace records or sending messages.
+
+## Breakpoint checks — profile name wrapping
+
+The Opportunity profile selector keeps native option selection and keyboard behavior, with a wrapping presentation of the selected name. The accessible combobox retains its complete selected option; the display copy is hidden from assistive technology. Removed the 460px label cap so the field can use available desktop space.
+
+Checked widths: 320, 360, 390, 600, 601, 699, 700, 701, 800, 900, 901, 1149, 1150, 1151, 1280 and 1440px. At every width the entire selected name fits, document width matches viewport width, both popovers stay inside the viewport, and opening either leaves its toolbar row height unchanged. Verified profile switching to SAP and back without altering saved records. Job detail selection/back works below and at 1150px, and list/detail appear together at 1151px and above. Production build passes.
