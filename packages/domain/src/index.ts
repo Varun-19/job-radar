@@ -12,3 +12,5 @@ export * from './digest';
 export * from './company-universe';
 
 export * from './recruiter-review';
+
+export * from './board-scope';

@@ -24,7 +24,7 @@ export async function readJson(url:string,fetcher:typeof fetch,signal:AbortSigna
 export async function fetchBoard(input:JobBoard,fetcher:typeof fetch=fetch){
  const board=boardSchema.parse(input);const signal=AbortSignal.timeout(180000);
  try{
-  if(['workday','oracle','smartrecruiters','workable','remoteok','remotive','arbeitnow','weworkremotely'].includes(board.provider))return await fetchExtended(board,fetcher,signal);
+  if(['workday','oracle','smartrecruiters','rippling','workable','remoteok','remotive','arbeitnow','weworkremotely'].includes(board.provider))return await fetchExtended(board,fetcher,signal);
   const url=board.provider==='ashby'?`https://api.ashbyhq.com/posting-api/job-board/${board.token}`:board.provider==='greenhouse'?`https://boards-api.greenhouse.io/v1/boards/${board.token}/jobs?content=true`:`https://${board.provider==='lever-eu'?'api.eu.lever.co':'api.lever.co'}/v0/postings/${board.token}?mode=json`;
   const payload=await readJson(url,fetcher,AbortSignal.any([signal,AbortSignal.timeout(20000)]));
   const fetchedAt=new Date().toISOString();return {jobs:normalizeBoard(board,payload,fetchedAt),fetchedAt};

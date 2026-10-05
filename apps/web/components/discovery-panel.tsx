@@ -2,7 +2,7 @@
 import { ProviderIntake } from './provider-intake';
 import { useEffect, useState } from 'react';
 import { boardSchema, discoveryResponseSchema, type DiscoveredJob, type WorkspaceMutation, type WorkspaceSnapshot } from '@jobradar/contracts';
-import { remoteRegion, sameSource, postingContentChanged } from '@jobradar/domain';
+import { remoteRegion, sameSource, postingContentChanged, sameBoardScope, companyTier } from '@jobradar/domain';
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const pageSize = 25;
 export function DiscoveryPanel({data, mutate, saving, connected}: {
@@ -29,13 +29,13 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
  const selectedRows = visible.filter(j=>selected.includes(key(j)) && !saved(j));
  const selectableRows = pageRows.filter(j=>!saved(j));
  const profileName = data.profiles.find(p=>p.id===data.profile)?.name;
- const priority = (company:string)=>({ 'strategic-target':0,target:1,watch:2,opportunistic:3,unclassified:4,excluded:5 })[data.tiers[data.profile]?.[company.toLowerCase()]??'unclassified'];
+ const priority = (company:string)=>({ 'strategic-target':0,target:1,watch:2,opportunistic:3,unclassified:4,excluded:5 })[companyTier(data.tiers[data.profile],company)];
  const boards = [...data.boards].sort((a,b)=>priority(a.company)-priority(b.company)||a.company.localeCompare(b.company));
  async function addBoard(e:React.FormEvent<HTMLFormElement>) {
   e.preventDefault();const form=new FormData(e.currentTarget);
   const parsed=boardSchema.safeParse({id:crypto.randomUUID(),company:form.get('company'),provider:form.get('provider'),token:form.get('token'),searchText:String(form.get('searchText')??'').trim()||undefined});
-  if(!parsed.success){setError('Enter the company/source name and a supported token format.');return;}
-  if(data.boards.some(b=>b.provider===parsed.data.provider && b.token===parsed.data.token)){setError('This board is already configured.');return;}
+  if(!parsed.success){setError(parsed.error.issues[0]?.message??'Enter the company/source name and a supported token format.');return;}
+  if(data.boards.some(b=>sameBoardScope(b,parsed.data))){setError('This board and source query are already configured.');return;}
   if(await mutate([{type:'save-board',board:parsed.data}])) {
    setBoardId(parsed.data.id);setResults([]);setFetchedAt('');setSelected([]);setPage(0);setError('');setNotice('Company board saved.');
   }
@@ -73,10 +73,10 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
    <form onSubmit={addBoard}>
     <div className="form-grid">
      <label>Company name<input name="company" required maxLength={200}/></label>
-     <label>Provider<select name="provider"><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="lever-eu">Lever EU</option><option value="ashby">Ashby</option><option value="workable">Workable</option><option value="workday">Workday</option><option value="smartrecruiters">SmartRecruiters</option><option value="oracle">Oracle Recruiting Cloud</option><option value="remoteok">Remote OK</option><option value="remotive">Remotive</option><option value="arbeitnow">Arbeitnow</option><option value="weworkremotely">We Work Remotely RSS</option></select></label>
+     <label>Provider<select name="provider"><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="lever-eu">Lever EU</option><option value="ashby">Ashby</option><option value="workable">Workable</option><option value="workday">Workday</option><option value="smartrecruiters">SmartRecruiters</option><option value="rippling">Rippling ATS</option><option value="oracle">Oracle Recruiting Cloud</option><option value="remoteok">Remote OK</option><option value="remotive">Remotive</option><option value="arbeitnow">Arbeitnow</option><option value="weworkremotely">We Work Remotely RSS</option></select></label>
      <label>Board token<input name="token" required maxLength={200}/></label><label>Source query (optional, Workday / SmartRecruiters)<input name="searchText" maxLength={200} placeholder="frontend"/></label>
     </div>
-    <p className="fine-print">Hosted boards use their company token. Workday: tenant/wdN/site. Oracle: tenant.fa.region.oraclecloud.com/site. Remote feeds: all. Verify company identity before saving. Remote feeds preserve their own source links; country eligibility needs review.</p>
+    <p className="fine-print">Hosted boards use their company token. Workday: tenant/wdN/site. Oracle: tenant.fa.region.oraclecloud.com/site. Remote feeds: all. Verify company identity before saving. Workday and SmartRecruiters can have separate query scopes (for example frontend and SAP); each scope has its own scan schedule. Remote feeds preserve their own source links; country eligibility needs review.</p>
     <button className="secondary" disabled={!connected||saving||busy}>Save board</button>
    </form>
   </details>

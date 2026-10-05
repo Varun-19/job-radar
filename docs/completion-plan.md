@@ -53,3 +53,12 @@ Email recipient and delivery account requested; not yet supplied. Country eligib
 - Added a public Palo Alto recruiter lead from a separate contractor listing; no association with the Staff Frontend vacancy inferred. Current title/hiring remain unverified.
 - Added recruiter recheck view and MCP research-plan reminders: unverified contacts or evidence last reviewed seven or more days ago. Observation date is not post publication date; reminders do not perform autonomous research.
 - Current coverage: 42 company boards, four feeds, eight target roles and six sourced contacts. Remaining protected-provider access, full-universe resolution, continuous recruiter research, live SMTP and active-client MCP setup are still outstanding.
+
+## Source-coverage continuation — 5 October 2026
+
+- Verified seven public frontend-query Workday sources: NVIDIA (37 postings), Salesforce (12), Mastercard (24), Workday (16), Procore (11), Cisco (21) and Arctic Wolf (9). Enabled daily schedules. These are query-limited snapshots, not complete employer inventories.
+- Saved Procore's Bangalore Staff Frontend posting with a pending partial-fit proposal. The description says Staff Fullstack Engineer / Hubs Platform; Node/Ruby ownership, production-support duration and 24/7 expectations are explicitly flagged. Arctic Wolf's current backend/fullstack roles remain in discovery.
+- Added verified Mistral AI Ashby handle `mistral.ai` (209 postings). Fixed dotted Ashby handles while keeping traversal paths invalid.
+- Added Rippling public ATS adapter with complete pagination, stable identity validation, full description retrieval and duplicate-list handling. Live complete snapshot: 331 distinct postings; no backend/fullstack keyword matches automatically saved as Staff Frontend.
+- Fixed query-scope configuration: supported Workday/SmartRecruiters queries may coexist for one employer token (frontend versus SAP); equivalent scopes are rejected. Providers that ignore queries now reject nonempty searchText. Discovery ordering shares explicit company aliases.
+- Current coverage: 51 company boards and four remote feeds; nine saved target/review roles and six contacts. Full universe resolution, major-provider automated discovery, continuous recruiter research, live SMTP and active-chat MCP discovery remain incomplete.
