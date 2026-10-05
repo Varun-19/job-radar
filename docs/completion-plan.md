@@ -45,3 +45,11 @@ Email recipient and delivery account requested; not yet supplied. Country eligib
 - [ ] Authenticated/background major-provider discovery: no suitable connected provider search integration is available; live Indeed public access returned HTTP 401.
 - [ ] Live SMTP delivery: recipient/account requested; no details supplied yet.
 - [ ] Active-chat MCP tool discovery after client reload; SDK protocol verification is complete.
+
+## Continuation — 5 October 2026
+
+- Added Palo Alto Networks Workday frontend query source (39 full descriptions), verified through the official application link. Added its Bengaluru Staff Frontend role and pending evidence-grounded evaluation.
+- Resolved Tekion's provider migration: old Greenhouse token returned 404; official careers script points to Ashby `tekion`. Verified 102 postings and enabled daily scans. Its adjacent frontend Architect role was not imported into the Staff profile.
+- Added a public Palo Alto recruiter lead from a separate contractor listing; no association with the Staff Frontend vacancy inferred. Current title/hiring remain unverified.
+- Added recruiter recheck view and MCP research-plan reminders: unverified contacts or evidence last reviewed seven or more days ago. Observation date is not post publication date; reminders do not perform autonomous research.
+- Current coverage: 42 company boards, four feeds, eight target roles and six sourced contacts. Remaining protected-provider access, full-universe resolution, continuous recruiter research, live SMTP and active-client MCP setup are still outstanding.

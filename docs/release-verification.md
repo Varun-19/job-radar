@@ -74,3 +74,12 @@ The isolated PostgreSQL regression includes 1,001 newer unrelated postings hidin
 - Expanded backup was restored into a disposable database: 16 migrations, seven jobs, five contacts and eight professional evidence records matched the original. Only the disposable verification database was removed.
 
 Outstanding: authenticated/background discovery for major providers, additional company-source resolution, continuous recruiter research beyond the assisted workflow, SMTP recipient/account configuration and real delivery verification, and active-chat MCP reload. Plugin discovery did not return a ready-to-use job-search connector for the requested providers.
+
+## 5 October continuation verification
+
+- Verified Palo Alto Networks' official Apply link maps to Workday `paloaltonetworks/wd5/panwexternalcareers`; fetched 39 frontend-query full descriptions, enabled a daily schedule, and saved its Bengaluru Staff Frontend role with a pending résumé-based proposal.
+- Verified Tekion's current official careers script uses Ashby `tekion`, following historical Greenhouse HTTP 404. Fetched 102 postings, enabled daily scans, and left the adjacent frontend Architect role in discovery.
+- Added one sourced public recruiter lead from a separate Palo Alto contract job listing. Current hiring and ownership of the frontend role remain unverified; no messages sent.
+- Implemented and boundary-tested recruiter recheck reminders (unverified or evidence observed at least seven days ago), available in the UI and MCP research plan. No automated external recruiter search is claimed.
+- Passed 45 regression tests, one isolated PostgreSQL integration test with all 18 migrations, workspace type checks and production build. Live stdio MCP verified nine tools, eight target opportunities, eight reviewed claims and six public contact recheck entries.
+- Running browser verified 42 company boards, four feeds, eight saved roles, six contacts, the recruiter filter and the pending Palo Alto fit proposal. Active-chat MCP tools still unavailable, SMTP configuration still absent, and remaining full-universe and protected-provider discovery remain unfinished.

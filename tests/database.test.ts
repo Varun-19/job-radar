@@ -17,7 +17,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts','0010_source_presence','0011_notifications','0012_extended_sources','0013_additional_sources','0014_company_coverage','0015_noon_source','0016_razorpay_source'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts','0010_source_presence','0011_notifications','0012_extended_sources','0013_additional_sources','0014_company_coverage','0015_noon_source','0016_razorpay_source','0017_paloalto_source','0018_tekion_current_source'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
