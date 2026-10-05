@@ -36,3 +36,13 @@ Evidence has résumé versions, job checks and professional evidence views. Orig
 59 unit tests pass; the isolated PostgreSQL integration test also passes. Typecheck and production build pass. Intake tests cover profile matching, source/URL deduplication, changed content, stale snapshots, missing observations, excluded employers and whitespace normalization. Database checks cover automatic backfill, repeat-run idempotence, posting version retention and preserving shortlist state when scope changes.
 
 All ten routes were checked at 1280, 800 and 390px with no horizontal overflow. Browser checks covered queue counts and disjoint filtering, pagination, mobile selection/back, imports in Opportunities, source registration in Sources & scans and default pending-analysis selection. The live Staff Frontend profile contains 81 source candidates in Needs review; repeating backfill creates no additional changes. No applications, contacts, messages or job assessments were submitted by browser verification.
+
+## Job card and toolbar detail — 5 October 2026
+
+View options and Filters & sort use anchored popovers. Their content does not participate in row sizing. Outside clicks and Escape dismiss them, and Escape restores summary focus. Browser measurements confirm unchanged profile/search row heights with menus open at 1280, 800 and 390px; no horizontal overflow was observed.
+
+Job cards now display readable provider names (including LinkedIn when it is the recorded source), company-board classification, publication date when supplied, observation/addition date, a two-line description excerpt and recruiter availability. Unknown publication dates and missing contacts remain explicit. Cards contain no nested interactive links within their selection buttons.
+
+Selected-job details show source facts and hiring contacts. Only explicit job associations are labelled vacancy-linked. Exact company aliases can supply company contacts, whose vacancy ownership remains unverified. Contact details include title, recorded recruiting status, evidence date, profile/evidence links, source quotes and notes. The UI does not invent recruiter ownership, dates or provider coverage. A domain test verifies direct associations, canonical company matches and exclusion of similarly named unrelated employers.
+
+Verification: 60 unit tests pass, typecheck and production build pass. Mobile selection/back and the real Palo Alto Networks company-contact display were checked without changing any workspace records or sending messages.
