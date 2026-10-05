@@ -5,8 +5,8 @@ import { boardSchema, discoveryResponseSchema, type DiscoveredJob, type Workspac
 import { remoteRegion, sameSource, postingContentChanged, sameBoardScope, companyTier } from '@jobradar/domain';
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const pageSize = 25;
-export function DiscoveryPanel({data, mutate, saving, connected}: {
- data: WorkspaceSnapshot & {profile:string}; mutate:(m:WorkspaceMutation[])=>Promise<boolean>; saving:boolean; connected:boolean;
+export function DiscoveryPanel({data, mutate, saving, connected, mode='all'}: {
+ mode?:'all'|'sources'|'jobs'; data: WorkspaceSnapshot & {profile:string}; mutate:(m:WorkspaceMutation[])=>Promise<boolean>; saving:boolean; connected:boolean;
 }) {
  const [boardId,setBoardId] = useState('');
  const [results,setResults] = useState<DiscoveredJob[]>([]);
@@ -64,11 +64,11 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
   }
  }
  function filter(value:string,setValue:(v:string)=>void){setValue(value);setPage(0);setSelected([]);}
- return <><ProviderIntake data={data} profileId={data.profile} mutate={mutate} saving={saving} connected={connected}/><section className="panel field-space discovery-panel" aria-label="Live job discovery">
+ return <>{mode!=='sources'&&<ProviderIntake data={data} profileId={data.profile} mutate={mutate} saving={saving} connected={connected}/>}<section className="panel field-space discovery-panel" aria-label="Live job discovery">
   <p className="eyebrow">COMPANY BOARDS & REMOTE FEEDS</p>
-  <h2>Discover real postings</h2>
-  <p className="muted">Fetch a company board, filter roles and locations, then save promising jobs to {profileName}.</p>
-  <details>
+  <h2>{mode==='sources'?'Add a source':'Fetch postings for review'}</h2>
+  <p className="muted">{mode==='sources'?'Configure official company boards or supported remote feeds.':`Fetch additional postings, filter roles and locations, then add them to ${profileName}.`}</p>
+  {mode!=='jobs'&&<details open={mode==='sources'}>
    <summary>Add a company board</summary>
    <form onSubmit={addBoard}>
     <div className="form-grid">
@@ -79,8 +79,9 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
     <p className="fine-print">Hosted boards use their company token. Workday: tenant/wdN/site. Oracle: tenant.fa.region.oraclecloud.com/site. Remote feeds: all. Verify company identity before saving. Workday and SmartRecruiters can have separate query scopes (for example frontend and SAP); each scope has its own scan schedule. Remote feeds preserve their own source links; country eligibility needs review.</p>
     <button className="secondary" disabled={!connected||saving||busy}>Save board</button>
    </form>
-  </details>
-  <div className="toolbar field-space discovery-toolbar">
+  </details>}
+  {mode==='sources'&&error&&<p role="alert" className="notice">{error}</p>}{mode==='sources'&&notice&&<p role="status" className="notice">{notice}</p>}
+  {mode!=='sources'&&<><div className="toolbar field-space discovery-toolbar">
    <label>Company board<select disabled={busy||saving} value={boardId} onChange={e=>{setBoardId(e.target.value);setResults([]);setFetchedAt('');setSelected([]);setPage(0);setNotice('');setError('');}}>
     <option value="">Choose a configured board</option>
     {boards.map(b=><option key={b.id} value={b.id}>{b.company} · {b.provider}{b.searchText?` · query: ${b.searchText}`:''}</option>)}
@@ -114,5 +115,5 @@ export function DiscoveryPanel({data, mutate, saving, connected}: {
    {!visible.length&&<p className="discovery-empty">No postings match these filters. Try broader terms.</p>}
   </>}
   <p className="fine-print">Fetching leaves saved jobs unchanged. Updates retain previous versions; changed content returns to Needs review. A missing posting or failed fetch does not confirm closure.</p>
- </section></>;
+ </>}</section></>;
 }

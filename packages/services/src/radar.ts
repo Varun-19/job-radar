@@ -1,11 +1,14 @@
 import postgres from 'postgres';
+import {createWorkspaceStore,WorkspaceConflict} from './index';
+import {opportunityIntake} from './opportunity-intake';
 import { randomUUID, createHash } from 'node:crypto';
 import { fetchBoard } from '@jobradar/integrations';
 import { boardSchema, radarSchema, scheduleInputSchema, type JobBoard } from '@jobradar/contracts';
 import { postingContentChanged, candidateSignals } from '@jobradar/domain';
 export class ScanBusy extends Error {}
 export function createRadarService(url:string,fetcher:(board:JobBoard)=>ReturnType<typeof fetchBoard>=fetchBoard) {
- const sql=postgres(url,{max:3});
+ const sql=postgres(url,{max:3});const workspace=createWorkspaceStore(url);
+ async function syncOpportunities(){let conflicts=0;let added=0;for(;;){const snapshot=await workspace.read();const changes=opportunityIntake(snapshot,await readSnapshot(undefined,Infinity));if(!changes.length)return added;try{await workspace.mutate(snapshot.revision,changes);added+=changes.length;}catch(error){if(error instanceof WorkspaceConflict&&++conflicts<3)continue;throw error;}}}
  async function ensure(){await sql`INSERT INTO scan_schedules(board_id) SELECT id FROM job_boards ON CONFLICT DO NOTHING`;}
  async function readSnapshot(profileId?:string,limit=1000){await ensure();const [schedules,runs,inbox]=await Promise.all([
   sql`SELECT board_id AS "boardId",enabled,interval_minutes AS "intervalMinutes",next_run_at AS "nextRunAt",lease_until AS "leaseUntil" FROM scan_schedules ORDER BY board_id`,
@@ -45,10 +48,10 @@ export function createRadarService(url:string,fetcher:(board:JobBoard)=>ReturnTy
     if(!['remoteok','remotive','arbeitnow','weworkremotely'].includes(board.provider)){const present=snapshot.jobs.map(j=>j.source.postingId);await tx`UPDATE discovery_inbox SET missing_count=missing_count+1,last_missing_at=${snapshot.fetchedAt} WHERE board_id=${boardId} AND posting_id != ALL(${present})`;}
     await tx`UPDATE scan_runs SET status='succeeded',finished_at=now(),count=${snapshot.jobs.length},new_count=${newCount},changed_count=${changedCount} WHERE id=${runId}`;
     await tx`UPDATE scan_schedules SET lease_until=NULL,claim_token=NULL,next_run_at=now()+interval_minutes*interval '1 minute' WHERE board_id=${boardId}`;
-   });return runId;
+   });await syncOpportunities().catch(error=>console.error('Opportunity intake will retry on the next worker tick.',error));return runId;
   }catch(e){await sql.begin(async tx=>{await tx`UPDATE scan_runs SET status='failed',finished_at=now(),message=${e instanceof Error?e.message:'Scan failed'} WHERE id=${runId}`;await tx`UPDATE scan_schedules SET lease_until=NULL,claim_token=NULL,next_run_at=now()+greatest(interval_minutes,30)*interval '1 minute' WHERE board_id=${boardId} AND claim_token=${token}`;});throw e;}finally{clearInterval(heartbeat);await renewal;}
  }
- async function tick(){await ensure();const due=await sql`SELECT board_id FROM scan_schedules WHERE enabled AND next_run_at<=now() AND (lease_until IS NULL OR lease_until<=now()) ORDER BY next_run_at LIMIT 10`;for(const row of due)try{await scan(row.board_id,true);}catch(e){console.error(`Scan failed for ${row.board_id}:`,e instanceof Error?e.message:e);}}
+ async function tick(){await syncOpportunities();await ensure();const due=await sql`SELECT board_id FROM scan_schedules WHERE enabled AND next_run_at<=now() AND (lease_until IS NULL OR lease_until<=now()) ORDER BY next_run_at LIMIT 10`;for(const row of due)try{await scan(row.board_id,true);}catch(e){console.error(`Scan failed for ${row.board_id}:`,e instanceof Error?e.message:e);}}
  // UI/MCP reads stay bounded; notification filtering needs the full source inventory.
- return {read:(profileId?:string)=>readSnapshot(profileId),readForNotifications:()=>readSnapshot(undefined,Infinity),configure,scan,tick,close:()=>sql.end()};
+ return {read:(profileId?:string)=>readSnapshot(profileId),readForNotifications:()=>readSnapshot(undefined,Infinity),configure,scan,tick,syncOpportunities,close:async()=>{await workspace.close();await sql.end();}};
 }

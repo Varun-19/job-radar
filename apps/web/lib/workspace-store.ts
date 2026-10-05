@@ -7,18 +7,19 @@ interface Workspace extends WorkspaceSnapshot { profile:string; sorts:Record<str
 const api = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const empty:Workspace={revision:0,dismissedAlerts:[],contacts:[],outreach:[],evaluations:[],boards:[],postingRevisions:[],profiles:initialProfiles,tiers:{},jobs:[],resumes:[],evidence:[],applications:[],activities:[],profile:'staff',sorts:{}};
 async function request(path:string,options?:RequestInit):Promise<WorkspaceSnapshot> {const response=await fetch(`${api}${path}`,options);if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.message??`Backend request failed (${response.status}).`);}return workspaceSchema.parse(await response.json());}
-export function useWorkspace() {
+export function useWorkspace(live=false) {
  const [data,setData]=useState<Workspace>(empty); const state=useRef(data);
  const [ready,setReady]=useState(false);const [saving,setSaving]=useState(false);const [error,setError]=useState('');const [connected,setConnected]=useState(false);const [hasLocalDrafts,setHasLocalDrafts]=useState(false);
- const queue=useRef(Promise.resolve());
+ const queue=useRef(Promise.resolve());const pending=useRef(0);
+ useEffect(()=>{if(!live)return;let alive=true;const timer=setInterval(()=>{if(pending.current)return;void request('/workspace').then(snapshot=>{if(alive&&!pending.current&&snapshot.revision!==state.current.revision)apply({...snapshot,profile:state.current.profile,sorts:state.current.sorts});}).catch(()=>{});},15000);return()=>{alive=false;clearInterval(timer);};},[live]);
  function apply(next:Workspace) {state.current=next;setData(next);}
  useEffect(()=>{let alive=true; request('/workspace').then(snapshot=>{if(!alive)return;let prefs:{profile?:string;sorts?:Record<string,string>}={};try{prefs=JSON.parse(localStorage.getItem('jobradar.view.v1')??'{}');const old=JSON.parse(localStorage.getItem('jobradar.workbench.v1')??'null');setHasLocalDrafts(!!(old?.jobs?.length||Object.keys(old?.tiers??{}).length));}catch{}const profile=snapshot.profiles.some(p=>p.id===prefs.profile)?prefs.profile!:'staff';apply({...snapshot,profile,sorts:prefs.sorts??{}});setConnected(true);}).catch(e=>{if(alive)setError(`${e.message} Start the database/API, then reload.`);}).finally(()=>{if(alive)setReady(true);});return()=>{alive=false;};},[]);
  function persistView(profile:string,sorts:Record<string,string>){try{localStorage.setItem('jobradar.view.v1',JSON.stringify({profile,sorts}));}catch{setError('View preference could not be saved in this browser.');}}
  function mutate(mutations:WorkspaceMutation[]) {
   if(!connected){setError('Connect the database before saving changes.');return Promise.resolve(false);}
-  setSaving(true);setError('');
+  pending.current++;setSaving(true);setError('');
   const task=queue.current.then(async()=>{const snapshot=await request('/workspace/mutations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:state.current.revision,mutations})});apply({...snapshot,profile:state.current.profile,sorts:state.current.sorts});});
-  const settled=task.then(()=>true).catch(async e=>{setError(`${e.message} Your change was not saved.`);try{const snapshot=await request('/workspace');apply({...snapshot,profile:state.current.profile,sorts:state.current.sorts});}catch{setConnected(false);}return false;}).finally(()=>setSaving(false));queue.current=settled.then(()=>{});return settled;
+  const settled=task.then(()=>true).catch(async e=>{setError(`${e.message} Your change was not saved.`);try{const snapshot=await request('/workspace');apply({...snapshot,profile:state.current.profile,sorts:state.current.sorts});}catch{setConnected(false);}return false;}).finally(()=>{pending.current--;setSaving(pending.current>0);});queue.current=settled.then(()=>{});return settled;
  }
  function update(change:(previous:Workspace)=>Workspace) {
   const old=state.current;const next=change(old);const mutations:WorkspaceMutation[]=[];

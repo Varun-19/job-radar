@@ -6,7 +6,7 @@ function download(name:string,value:unknown){const href=URL.createObjectURL(new 
 export function AnalysisWorkspace(){
  const {data,ready,error,saving,mutate,update}=useWorkspace();const [selected,setSelected]=useState('');const [input,setInput]=useState('');const [notice,setNotice]=useState('');const [packet,setPacket]=useState('');
  useEffect(()=>setSelected(new URLSearchParams(window.location.search).get('jobId')??''),[]);
- const jobs=data.jobs.filter(j=>j.profileId===data.profile);const job=jobs.find(j=>j.id===selected)??jobs[0];const profile=data.profiles.find(p=>p.id===data.profile)!;
+ const jobs=data.jobs.filter(j=>j.profileId===data.profile);const job=jobs.find(j=>j.id===selected)??jobs.find(j=>data.evaluations.some(e=>e.jobId===j.id&&e.status==='pending'))??jobs[0];const profile=data.profiles.find(p=>p.id===data.profile)!;
  useEffect(()=>setPacket(''),[job?.id]);
  const proposals=data.evaluations.filter(e=>e.jobId===job?.id).sort((a,b)=>Number(b.status==='pending')-Number(a.status==='pending')||b.createdAt.localeCompare(a.createdAt));
  function exportPacket(){if(!job)return;const value=buildReviewPacket(data,job.id);setPacket(JSON.stringify(value,null,2));setNotice('Review packet prepared. Copy the JSON below or download it.');}

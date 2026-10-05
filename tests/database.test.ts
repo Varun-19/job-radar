@@ -141,6 +141,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
     snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile:{...snapshot.profiles.find(p=>p.id===profile.id)!,discovery:{levelTerms:['Staff'],roleTerms:['frontend'],locationTerms:['Bengaluru'],excludedTitleTerms:[]}}}]);
     assert.equal((await radar.read(profile.id)).inbox.length,1);assert.equal((await radar.read('staff')).inbox.length,0);
     const count=state.runs.length;await radar.tick();assert.equal((await radar.read()).runs.length,count);
+    snapshot=await store.read();const intakeJob=snapshot.jobs.find(j=>j.profileId===profile.id&&j.source?.postingId==='radar-1')!;assert.ok(intakeJob);assert.equal(intakeJob.alignment,'review');assert.equal(intakeJob.eligibility,'unknown');const intakeRevision=snapshot.revision;await radar.syncOpportunities();assert.equal((await store.read()).revision,intakeRevision);assert.equal(snapshot.postingRevisions.filter(r=>r.jobId===intakeJob.id).length,1);
     // An unrelated, newer board must not hide matching roles from notification input.
     const newer=new Date(Date.now()+1000).toISOString();
     const unrelated=Array.from({length:1001},(_,i)=>({id:`unrelated-${i}`,postingId:`unrelated-${i}`,posting:{...fixturePosting,title:'Backend Engineer',url:`https://example.com/backend/${i}`}}));
@@ -158,6 +159,8 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
      await notifications.queue(snapshot,notificationInput,now);
      const [sent]=await sql`SELECT body FROM notification_outbox WHERE id=${updated.id}`;assert.equal(sent.body,updated.body);assert.equal((await notifications.retry(updated.id)).requeued,false);await sql`UPDATE notification_outbox SET status='failed' WHERE id=${updated.id}`;assert.equal((await notifications.retry(updated.id)).requeued,true);assert.equal((await notifications.retry(updated.id)).requeued,false);}finally{await notifications.close();await rm(directory,{recursive:true,force:true});}
 
+    snapshot=await store.read();snapshot=await store.mutate(snapshot.revision,[{type:'assess-job',id:intakeJob.id,alignment:'primary',fit:'unknown',eligibility:'confirmed'},{type:'shortlist',id:intakeJob.id,shortlisted:true}]);
+    fixturePosting={...fixturePosting,description:'Changed frontend responsibilities',source:{...fixturePosting.source,fetchedAt:new Date(Date.now()+5000).toISOString()}};await radar.scan('fixture-board');snapshot=await store.read();const refreshed=snapshot.jobs.find(j=>j.id===intakeJob.id)!;assert.equal(refreshed.alignment,'review');assert.equal(refreshed.eligibility,'unknown');assert.equal(refreshed.shortlisted,true);assert.equal(snapshot.jobs.filter(j=>j.profileId===profile.id&&j.source?.postingId==='radar-1').length,1);assert.equal(snapshot.postingRevisions.filter(r=>r.jobId===intakeJob.id).length,2);
    }finally{await radar.close();}
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
  }finally{await admin.unsafe(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();}
