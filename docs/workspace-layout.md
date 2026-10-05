@@ -1,0 +1,11 @@
+# Workspace layout
+
+The daily search is the primary navigation: Today, Opportunities, Applications and Recruiters. Discovery and analysis are review queues. Profiles, résumé evidence, company preferences and connections sit under Search setup, which opens automatically when visiting one of those pages. The current page is visibly marked.
+
+- Today groups notices into actionable counts rather than displaying every observation on arrival. Individual notices and acknowledgments remain available. Saved-job and application counts follow the selected profile. Résumé onboarding appears only before a résumé exists.
+- Opportunities shows company, role, location and review state in the list. Company targeting still controls the default sort. Filters, example previews, manual assessments and full source descriptions are secondary controls. Desktop uses list and detail side by side; below 1150 pixels, selecting a job opens its detail with a Back to jobs action that preserves selection and keyboard focus. Canonical unknowns remain explicit and pending proposals are not accepted assessments.
+- Discovery shows source candidates first. Company scan management is collapsed, respects the selected board filter, and exposes one employer's settings at a time. Existing scan and save behavior is retained.
+- Recruiters shows saved people first, with hiring quotes and notes behind disclosures. Search and contact entry are deliberate actions. Add/edit places the editor above the list and focuses its first input. No messages are sent.
+- Connections presents four concise cards: sources, email, job sites and assistant connection. Query limits, provider boundaries, delivery history, verification and client setup remain available within disclosures. Configured sources and MCP registration do not imply successful current scans or loaded client tools.
+
+Verification: type checking, production build and 54 passing unit tests (database integration suite is opt-in). Browser checks covered email verification without sending, company filtering, full source text, contact entry/cancel, board-filtered scan settings, grouped navigation, and the narrow-window job/back flow. No job assessments or contacts were changed for layout verification.
