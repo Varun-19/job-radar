@@ -7,3 +7,11 @@ test('alerts retain new versions while acknowledgments hide only the exact notic
  const radar=radarSchema.parse({schedules:[],runs:[],inbox:[{id:'candidate',boardId:'fixture',posting,version:1,firstSeenAt:posting.source.fetchedAt,lastSeenAt:posting.source.fetchedAt,changedAt:posting.source.fetchedAt,change:'new'}]});
  const alerts=workspaceAlerts(workspace,radar,'2026-10-03','staff');assert.equal(alerts.length,1);workspace.dismissedAlerts.push(alerts[0].id);assert.equal(workspaceAlerts(workspace,radar,'2026-10-03','staff').length,0);radar.inbox[0].version=2;assert.equal(workspaceAlerts(workspace,radar,'2026-10-03','staff').length,1);
 });
+test('application follow-ups belong to the active job profile and exclude closed records',()=>{
+ const job=(id:string,profileId:string)=>({id,profileId,company:id,title:'Staff Frontend',location:'India',description:'',url:'',alignment:'review',fit:'unknown',eligibility:'unknown',createdAt:'2026-10-03T12:00:00Z',shortlisted:false});
+ const application=(id:string,jobId:string,stage='applied')=>({id,jobId,stage,resumeVersionId:null,followUpAt:'2026-10-05',submittedAt:null,createdAt:'2026-10-03T12:00:00Z',updatedAt:'2026-10-03T12:00:00Z'});
+ const workspace=workspaceSchema.parse({revision:0,profiles:initialProfiles,tiers:{},jobs:[job('staff-job','staff'),job('sap-job','sap')],applications:[application('staff-app','staff-job'),application('sap-app','sap-job'),application('closed','staff-job','rejected')]});
+ assert.deepEqual(workspaceAlerts(workspace,undefined,'2026-10-05','staff').map(a=>a.id),['application:staff-app:2026-10-05']);
+ assert.deepEqual(workspaceAlerts(workspace,undefined,'2026-10-05','sap').map(a=>a.id),['application:sap-app:2026-10-05']);
+ assert.equal(workspaceAlerts(workspace,undefined,'2026-10-04','staff').length,0);
+});
