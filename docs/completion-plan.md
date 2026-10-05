@@ -31,7 +31,7 @@ User requests recruiter lists only; message sending is excluded. Existing outrea
 - [x] MCP configuration registered and seven tools verified over SDK stdio. Active-client discovery awaits client reload.
 - [x] Local launchd startup service running; missing-source observations and durable daily/weekly digest queue implemented. SMTP delivery awaits recipient/account configuration and has not been live-tested.
 
-Email recipient and delivery account requested; not yet supplied. Country eligibility, recruiter ownership and résumé claims must never be guessed.
+Email recipient supplied on 5 October; Gmail defaults configured locally, authentication and delivery remain unverified. Country eligibility, recruiter ownership and résumé claims must never be guessed.
 
 ## Remaining-scope implementation and access audit
 
@@ -43,7 +43,7 @@ Email recipient and delivery account requested; not yet supplied. Country eligib
 - [x] SMTP connection test and controlled recovery of failed messages. Actual recipient delivery requires account configuration.
 - [ ] Resolve remaining company-board providers and configure verified sources.
 - [ ] Authenticated/background major-provider discovery: no suitable connected provider search integration is available; live Indeed public access returned HTTP 401.
-- [ ] Live SMTP delivery: recipient/account requested; no details supplied yet.
+- [ ] Live SMTP delivery: recipient supplied and Gmail defaults prepared; local credentials and a live delivery test still required.
 - [ ] Active-chat MCP tool discovery after client reload; SDK protocol verification is complete.
 
 ## Continuation — 5 October 2026
@@ -62,3 +62,12 @@ Email recipient and delivery account requested; not yet supplied. Country eligib
 - Added Rippling public ATS adapter with complete pagination, stable identity validation, full description retrieval and duplicate-list handling. Live complete snapshot: 331 distinct postings; no backend/fullstack keyword matches automatically saved as Staff Frontend.
 - Fixed query-scope configuration: supported Workday/SmartRecruiters queries may coexist for one employer token (frontend versus SAP); equivalent scopes are rejected. Providers that ignore queries now reject nonempty searchText. Discovery ordering shares explicit company aliases.
 - Current coverage: 51 company boards and four remote feeds; nine saved target/review roles and six contacts. Full universe resolution, major-provider automated discovery, continuous recruiter research, live SMTP and active-chat MCP discovery remain incomplete.
+
+## Recurring research and email handoff — 5 October 2026
+
+- Added a stdio research CLI using the same scoped MCP tools and validation; live research-plan retrieval verified against the local database. Plans now expose the workspace revision for conflict-safe imports.
+- Created and viewed an active daily 09:30 local-time chat research schedule for public provider discovery, official-board verification, unresolved-company rotation and sourced recruiter-list research. No messaging or paid API adapter. First unattended run remains to be verified.
+- Ran an initial public research cycle. Existing employer roles were duplicates; Arctic Wolf's cached Staff Front End listing redirects to an expired-job search page. No new jobs or contacts imported. Naukri robots restrictions and inaccessible LinkedIn profiles were recorded locally rather than treated as successful research.
+- Coverage audit: 120 historical companies, 50 with configured boards, 70 without. One configured board (Arctic Wolf) is outside that universe; total remains 51 company boards plus four feeds. Scheduled public research supplements coverage; it does not turn unresolved companies into automatic source adapters.
+- Configured recipient and Gmail defaults only in ignored .env. Missing or partial Gmail credentials now show incomplete status and cannot claim/send queued messages. Authentication checks do not send email. Live delivery and active-chat MCP loading remain external setup steps.
+- See research-operations.md for the repeatable workflow and honest provider boundaries.

@@ -24,7 +24,8 @@
     "start": "concurrently -k -n web,api \"npm run start -w @jobradar/web\" \"npm run start -w @jobradar/api\"",
     "start:local": "node --import tsx scripts/run-local.mts",
     "install:autostart": "node --import tsx scripts/install-autostart.mts",
-    "mcp:register": "node --import tsx scripts/register-mcp.mts"
+    "mcp:register": "node --import tsx scripts/register-mcp.mts",
+    "research": "node --import tsx scripts/research.mts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
