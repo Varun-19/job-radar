@@ -7,6 +7,7 @@ export * from './workspace';
 export * from './tracking';
 
 export * from './discovery';
+export * from './source-coverage';
 export * from './radar';
 export * from './evaluations';
 

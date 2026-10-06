@@ -31,6 +31,8 @@ export function createApp(store?:WorkspaceStore,radar?:ReturnType<typeof createR
   try{return await store.mutate(parsed.data.expectedRevision,parsed.data.mutations);}catch(e){if(e instanceof WorkspaceConflict)return reply.code(409).send({message:e.message});if(e instanceof InvalidMutation)return reply.code(400).send({message:e.message});throw e;}
  });
  app.get<{Querystring:{profileId?:string}}>('/radar',async(request,reply)=>radar?radar.read(request.query.profileId):reply.code(503).send({message:'Radar is not configured.'}));
+ app.get('/radar/coverage',async(_request,reply)=>radar?radar.coverage():reply.code(503).send({message:'Radar is not configured.'}));
+ app.get('/radar/opportunity-observations',async(_request,reply)=>radar?radar.opportunityObservations():reply.code(503).send({message:'Radar is not configured.'}));
  app.post('/radar/schedules',async(request,reply)=>{
   if(request.headers.origin&&request.headers.origin!==origin)return reply.code(403).send({message:'Origin not allowed.'});
   if(!radar)return reply.code(503).send({message:'Radar is not configured.'});

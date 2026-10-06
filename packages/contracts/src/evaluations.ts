@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { WorkspaceSnapshot } from './workspace';
 export const evaluationInputSchema=z.object({
  id:z.string().min(1).max(100),jobId:z.string().min(1).max(100),profileVersion:z.number().int().positive(),postingRevisionId:z.string().nullable(),
  roleFamily:z.enum(['frontend_web','frontend_platform','ai_product','frontend_dominant','backend_specialist','infra_specialist','ml_specialist','management','other']),
@@ -11,3 +12,9 @@ export const evaluationInputSchema=z.object({
 });
 export const evaluationSchema=evaluationInputSchema.extend({status:z.enum(['pending','accepted','rejected']),createdAt:z.iso.datetime(),reviewedAt:z.iso.datetime().nullable()});
 export type EvaluationProposal=z.infer<typeof evaluationInputSchema>;
+export function evaluationIsCurrent(snapshot:Pick<WorkspaceSnapshot,'jobs'|'profiles'|'postingRevisions'>,proposal:Pick<EvaluationProposal,'jobId'|'profileVersion'|'postingRevisionId'>):boolean{
+ const job=snapshot.jobs.find(j=>j.id===proposal.jobId);
+ const profile=snapshot.profiles.find(p=>p.id===job?.profileId);
+ const posting=snapshot.postingRevisions.filter(r=>r.jobId===proposal.jobId).sort((a,b)=>b.version-a.version)[0];
+ return !!job&&!!profile&&profile.version===proposal.profileVersion&&(posting?.id??null)===proposal.postingRevisionId;
+}

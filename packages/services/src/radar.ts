@@ -3,8 +3,8 @@ import {createWorkspaceStore,WorkspaceConflict} from './index';
 import {opportunityIntake} from './opportunity-intake';
 import { randomUUID, createHash } from 'node:crypto';
 import { fetchBoard } from '@jobradar/integrations';
-import { boardSchema, radarSchema, scheduleInputSchema, type JobBoard } from '@jobradar/contracts';
-import { postingContentChanged, candidateSignals } from '@jobradar/domain';
+import { boardSchema, radarSchema, scheduleInputSchema,sourceCoverageSchema,opportunityObservationsSchema, type JobBoard } from '@jobradar/contracts';
+import { companies,companyKey,postingContentChanged, candidateSignals } from '@jobradar/domain';
 export class ScanBusy extends Error {}
 export function createRadarService(url:string,fetcher:(board:JobBoard)=>ReturnType<typeof fetchBoard>=fetchBoard) {
  const sql=postgres(url,{max:3});const workspace=createWorkspaceStore(url);
@@ -12,10 +12,24 @@ export function createRadarService(url:string,fetcher:(board:JobBoard)=>ReturnTy
  async function ensure(){await sql`INSERT INTO scan_schedules(board_id) SELECT id FROM job_boards ON CONFLICT DO NOTHING`;}
  async function readSnapshot(profileId?:string,limit=1000){await ensure();const [schedules,runs,inbox]=await Promise.all([
   sql`SELECT board_id AS "boardId",enabled,interval_minutes AS "intervalMinutes",next_run_at AS "nextRunAt",lease_until AS "leaseUntil" FROM scan_schedules ORDER BY board_id`,
-  sql`SELECT id,board_id AS "boardId",status,started_at AS "startedAt",finished_at AS "finishedAt",message,count,new_count AS "newCount",changed_count AS "changedCount" FROM scan_runs ORDER BY started_at DESC LIMIT 100`,
+  sql`WITH recent AS (SELECT * FROM scan_runs ORDER BY started_at DESC LIMIT 100), latest AS (SELECT DISTINCT ON (board_id) * FROM scan_runs ORDER BY board_id,started_at DESC) SELECT id,board_id AS "boardId",status,started_at AS "startedAt",finished_at AS "finishedAt",message,count,new_count AS "newCount",changed_count AS "changedCount" FROM (SELECT * FROM recent UNION SELECT * FROM latest) combined ORDER BY started_at DESC`,
   sql`SELECT id,board_id AS "boardId",posting,version,first_seen_at AS "firstSeenAt",last_seen_at AS "lastSeenAt",changed_at AS "changedAt",change,missing_count AS "missingCount",last_missing_at AS "lastMissingAt" FROM discovery_inbox ORDER BY changed_at DESC`
  ]);const dates=(rows:any[])=>rows.map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>[key,value instanceof Date?value.toISOString():value])));let filtered=[...inbox];if(profileId){const [profile]=await sql`SELECT config FROM search_profiles WHERE id=${profileId}`;filtered=profile?.config.discovery?inbox.filter(row=>candidateSignals(row.posting,profile.config.discovery).candidate):[];}return radarSchema.parse({schedules:dates(schedules),runs:dates(runs),inbox:dates(filtered.slice(0,limit)),totalInbox:filtered.length,truncated:filtered.length>limit});}
  async function configure(input:unknown){const setting=scheduleInputSchema.parse(input);const [board]=await sql`SELECT data FROM job_boards WHERE id=${setting.boardId}`;if(board?.data.provider==='remotive'&&setting.intervalMinutes<360)throw new Error('Remotive scans must be at least six hours apart.');await ensure();const result=await sql`UPDATE scan_schedules SET enabled=${setting.enabled},interval_minutes=${setting.intervalMinutes},next_run_at=now() WHERE board_id=${setting.boardId} RETURNING board_id`;if(!result.length)throw new Error('Unknown company board.');return readSnapshot();}
+ async function coverage(){
+  await ensure();const [boardRows,statusRows]=await Promise.all([
+   sql`SELECT b.data,s.enabled FROM job_boards b JOIN scan_schedules s ON s.board_id=b.id ORDER BY b.data->>'company'`,
+   sql`SELECT b.id,r.id AS run_id,r.status,r.started_at,r.finished_at,r.message,r.count,r.new_count,r.changed_count,(SELECT count(*)::int FROM discovery_inbox i WHERE i.board_id=b.id AND missing_count=0) AS observed,(SELECT count(*)::int FROM discovery_inbox i WHERE i.board_id=b.id AND missing_count>0) AS missing,(SELECT count(*)::int FROM discovery_inbox i WHERE i.board_id=b.id AND missing_count=0 AND length(posting->>'description')<300) AS short FROM job_boards b LEFT JOIN LATERAL (SELECT * FROM scan_runs WHERE board_id=b.id ORDER BY started_at DESC LIMIT 1) r ON true`
+  ]);
+  const feeds=new Set(['remoteok','remotive','arbeitnow','weworkremotely']);
+  const sources=boardRows.map(row=>{const r=statusRows.find(s=>s.id===row.data.id)!;return {board:row.data,enabled:row.enabled,observed:r.observed,missing:r.missing,shortDescriptions:r.short,latestRun:r.run_id?{id:r.run_id,boardId:row.data.id,status:r.status,startedAt:r.started_at.toISOString(),finishedAt:r.finished_at?.toISOString()??null,message:r.message,count:r.count,newCount:r.new_count,changedCount:r.changed_count}:null};});
+  const covered=new Set(sources.filter(s=>!feeds.has(s.board.provider)).map(s=>companyKey(s.board.company)));const uncoveredCompanies=companies.filter(c=>!covered.has(companyKey(c)));
+  return sourceCoverageSchema.parse({sources,companyBoards:sources.filter(s=>!feeds.has(s.board.provider)).length,remoteFeeds:sources.filter(s=>feeds.has(s.board.provider)).length,universeCompanies:companies.length,coveredUniverseCompanies:companies.length-uncoveredCompanies.length,uncoveredCompanies,assistedProviders:['LinkedIn','Indeed','Naukri','Glassdoor','Wellfound']});
+ }
+ async function opportunityObservations(){
+  const rows=await sql`SELECT DISTINCT ON (j.id) j.id AS "jobId",i.last_seen_at AS "lastSeenAt",i.missing_count AS "missingCount",i.last_missing_at AS "lastMissingAt" FROM opportunity_drafts j JOIN discovery_inbox i ON i.posting->'source'->>'provider'=j.data->'source'->>'provider' AND i.posting->'source'->>'board'=j.data->'source'->>'board' AND i.posting->'source'->>'postingId'=j.data->'source'->>'postingId' ORDER BY j.id,i.missing_count=0 DESC,i.last_seen_at DESC`;
+  return opportunityObservationsSchema.parse(rows.map(row=>({...row,lastSeenAt:row.lastSeenAt.toISOString(),lastMissingAt:row.lastMissingAt?.toISOString()??null})));
+ }
  async function scan(boardId:string,dueOnly=false){
   await ensure();const token=randomUUID();const runId=randomUUID();
   const board=await sql.begin(async tx=>{
@@ -53,5 +67,5 @@ export function createRadarService(url:string,fetcher:(board:JobBoard)=>ReturnTy
  }
  async function tick(){await syncOpportunities();await ensure();const due=await sql`SELECT board_id FROM scan_schedules WHERE enabled AND next_run_at<=now() AND (lease_until IS NULL OR lease_until<=now()) ORDER BY next_run_at LIMIT 10`;for(const row of due)try{await scan(row.board_id,true);}catch(e){console.error(`Scan failed for ${row.board_id}:`,e instanceof Error?e.message:e);}}
  // UI/MCP reads stay bounded; notification filtering needs the full source inventory.
- return {read:(profileId?:string)=>readSnapshot(profileId),readForNotifications:()=>readSnapshot(undefined,Infinity),configure,scan,tick,syncOpportunities,close:async()=>{await workspace.close();await sql.end();}};
+ return {read:(profileId?:string)=>readSnapshot(profileId),readForNotifications:()=>readSnapshot(undefined,Infinity),coverage,opportunityObservations,configure,scan,tick,syncOpportunities,close:async()=>{await workspace.close();await sql.end();}};
 }

@@ -17,7 +17,7 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
   const isolated=new URL(url);isolated.pathname=`/${name}`;
   const sql=postgres(isolated.toString(),{max:1});
   try {
-   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts','0010_source_presence','0011_notifications','0012_extended_sources','0013_additional_sources','0014_company_coverage','0015_noon_source','0016_razorpay_source','0017_paloalto_source','0018_tekion_current_source','0019_workday_universe','0020_mistral_rippling'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
+   for(const migration of ['0001_workspace','0002_tracking','0003_discovery','0004_posting_history','0005_radar','0006_source_coverage','0007_evaluations','0008_recruiters','0009_alerts','0010_source_presence','0011_notifications','0012_extended_sources','0013_additional_sources','0014_company_coverage','0015_noon_source','0016_razorpay_source','0017_paloalto_source','0018_tekion_current_source','0019_workday_universe','0020_mistral_rippling','0021_discovery_corrections'])await sql.unsafe(await readFile(new URL(`../packages/db/migrations/${migration}.sql`,import.meta.url),'utf8'));
    store=createWorkspaceStore(isolated.toString());let snapshot=await store.read();assert.equal(snapshot.profiles.length,2);
    const profile={id:'test-profile',name:'SAP integration',version:1,roleFamilies:['SAP integrations'],levels:[],locations:['India'],keywords:[],exclusions:[]};
    snapshot=await store.mutate(snapshot.revision,[{type:'save-profile',profile}]);
@@ -161,6 +161,13 @@ test('PostgreSQL persists workspace changes, versions profiles, and rejects stal
 
     snapshot=await store.read();snapshot=await store.mutate(snapshot.revision,[{type:'assess-job',id:intakeJob.id,alignment:'primary',fit:'unknown',eligibility:'confirmed'},{type:'shortlist',id:intakeJob.id,shortlisted:true}]);
     fixturePosting={...fixturePosting,description:'Changed frontend responsibilities',source:{...fixturePosting.source,fetchedAt:new Date(Date.now()+5000).toISOString()}};await radar.scan('fixture-board');snapshot=await store.read();const refreshed=snapshot.jobs.find(j=>j.id===intakeJob.id)!;assert.equal(refreshed.alignment,'review');assert.equal(refreshed.eligibility,'unknown');assert.equal(refreshed.shortlisted,true);assert.equal(snapshot.jobs.filter(j=>j.profileId===profile.id&&j.source?.postingId==='radar-1').length,1);assert.equal(snapshot.postingRevisions.filter(r=>r.jobId===intakeJob.id).length,2);
+    const observations=await radar.opportunityObservations();const observed=observations.find(o=>o.jobId===intakeJob.id)!;assert.equal(observed.missingCount,0);assert.equal(observed.lastSeenAt,fixturePosting.source.fetchedAt);
+    const coverage=await radar.coverage();const fixtureCoverage=coverage.sources.find(s=>s.board.id==='fixture-board')!;assert.equal(fixtureCoverage.enabled,true);assert.equal(fixtureCoverage.latestRun?.status,'succeeded');assert.equal(fixtureCoverage.observed,1);assert.equal(fixtureCoverage.missing,1001);assert.ok(coverage.assistedProviders.includes('LinkedIn'));
+    // An older source's latest status survives more than 100 runs on another board.
+    const quietBoard=snapshot.boards.find(b=>b.id!=='fixture-board')!;
+    await sql`INSERT INTO scan_runs(id,board_id,status,started_at,finished_at) VALUES (${randomUUID()},${quietBoard.id},'succeeded',now()-interval '2 days',now()-interval '2 days')`;
+    for(let i=0;i<101;i++)await sql`INSERT INTO scan_runs(id,board_id,status,started_at,finished_at) VALUES (${randomUUID()},'fixture-board','succeeded',now(),now())`;
+    assert.ok((await radar.read()).runs.some(r=>r.boardId===quietBoard.id));
    }finally{await radar.close();}
   }finally{if(store){await store.close();store=undefined;}await sql.end();}
  }finally{await admin.unsafe(`DROP DATABASE IF EXISTS "${name}"`);await admin.end();}

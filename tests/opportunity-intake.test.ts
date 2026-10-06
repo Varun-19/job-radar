@@ -22,3 +22,10 @@ test('missing observations, nonmatches and explicitly excluded companies do not 
 test('source whitespace normalization does not repeatedly refresh jobs or erase review decisions',()=>{
  const {workspace,radar}=fixtures();radar.inbox[0].posting.title+=' ';radar.inbox[0].posting.company=' Acme ';const change=opportunityIntake(workspace,radar)[0];if(change.type!=='add-job')throw Error();workspace.jobs.push({...change.job,alignment:'primary',eligibility:'confirmed'});assert.deepEqual(opportunityIntake(workspace,radar),[]);
 });
+
+test('a saved posting is refreshed when its new location no longer matches discovery',()=>{
+ const {workspace,radar}=fixtures();const change=opportunityIntake(workspace,radar)[0];if(change.type!=='add-job')throw Error();workspace.jobs.push({...change.job,alignment:'primary',eligibility:'confirmed'});
+ radar.inbox[0].posting.location='New York, United States';
+ const updates=opportunityIntake(workspace,radar);assert.equal(updates.length,1);assert.equal(updates[0].type,'refresh-job');
+ if(updates[0].type==='refresh-job')assert.equal(updates[0].posting.location,'New York, United States');
+});

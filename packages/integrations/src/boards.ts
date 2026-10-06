@@ -28,7 +28,7 @@ export async function fetchBoard(input:JobBoard,fetcher:typeof fetch=fetch){
   const url=board.provider==='ashby'?`https://api.ashbyhq.com/posting-api/job-board/${board.token}`:board.provider==='greenhouse'?`https://boards-api.greenhouse.io/v1/boards/${board.token}/jobs?content=true`:`https://${board.provider==='lever-eu'?'api.eu.lever.co':'api.lever.co'}/v0/postings/${board.token}?mode=json`;
   const payload=await readJson(url,fetcher,AbortSignal.any([signal,AbortSignal.timeout(20000)]));
   const fetchedAt=new Date().toISOString();return {jobs:normalizeBoard(board,payload,fetchedAt),fetchedAt};
- }catch(e){if(e instanceof DiscoveryFailure)throw e;throw new DiscoveryFailure('Could not read the complete source: timeout, network failure, or unsupported response. Existing records remain unchanged.');}
+ }catch(e){if(e instanceof DiscoveryFailure)throw e;const reason=e instanceof z.ZodError?`Unexpected fields: ${e.issues.slice(0,3).map(i=>i.path.join('.')).join(', ')}`:e instanceof Error?`${e.name}: ${e.message.slice(0,180)}`:'Unknown source error';throw new DiscoveryFailure(`Could not read the complete source (${reason}). Existing records remain unchanged.`);}
 }
 import { fetchExtended } from './extended-boards';
 export {previewProviderUrl,structuredPosting} from './provider-url';

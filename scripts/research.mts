@@ -4,7 +4,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
 // Uses the same server and validation as an attached MCP client. No paid adapter.
-const allowed=new Set(['get_research_plan','list_profiles','list_opportunities','list_discovery_candidates','preview_public_job_url','import_external_jobs','save_recruiter_contacts']);
+const allowed=new Set(['get_source_coverage','get_research_plan','list_profiles','list_opportunities','list_discovery_candidates','preview_public_job_url','import_external_jobs','save_recruiter_contacts']);
 const [name,inputPath]=process.argv.slice(2);
 if(!allowed.has(name??''))throw new Error('Usage: npm run research -- <tool> <arguments.json>. See docs/research-operations.md for allowed tools.');
 if(!inputPath)throw new Error('Provide a local JSON arguments file; keep research and personal data under ignored .local/.');

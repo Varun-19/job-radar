@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect,useState } from 'react';
 import { radarSchema,workspaceAlerts,type RadarSnapshot } from '@jobradar/contracts';
 import { useWorkspace } from '../lib/workspace-store';
+import {currentDiscoveryMatch} from '@jobradar/contracts';
 import {opportunityGroup,companyTier} from '@jobradar/domain';
 import { ApiStatus } from './api-status';
 export function TodayDashboard(){const {data,ready,error,mutate,update,saving}=useWorkspace(true);
@@ -11,7 +12,7 @@ export function TodayDashboard(){const {data,ready,error,mutate,update,saving}=u
  const today=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
  const alerts=workspaceAlerts(data,radar,today,data.profile);
  const profileJobs=data.jobs.filter(j=>j.profileId===data.profile);
- const reviewJobs=profileJobs.filter(j=>opportunityGroup(j,companyTier(data.tiers[data.profile],j.company))==='Needs review');
+ const reviewJobs=profileJobs.filter(j=>opportunityGroup(j,companyTier(data.tiers[data.profile],j.company),currentDiscoveryMatch(j,data.profiles.find(p=>p.id===data.profile),data.boards))==='Needs review');
  const active=data.applications.filter(a=>profileJobs.some(j=>j.id===a.jobId)&&!['accepted','rejected','withdrawn'].includes(a.stage));
  const alertGroups=[{name:'Job analyses to review',prefix:'proposal:',href:'/analysis'},{name:'New or changed listings',prefix:'candidate:',href:'/opportunities'},{name:'Source scans to check',prefix:'scan:',href:'/discovery'},{name:'Application follow-ups',prefix:'application:',href:'/applications'},{name:'Recruiter follow-ups',prefix:'outreach:',href:'/recruiters'}].map(g=>({...g,count:alerts.filter(a=>a.id.startsWith(g.prefix)).length})).filter(g=>g.count>0);
  const due=active.filter(a=>a.followUpAt&&a.followUpAt<=today).sort((a,b)=>a.followUpAt!.localeCompare(b.followUpAt!));

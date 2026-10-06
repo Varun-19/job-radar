@@ -74,9 +74,9 @@ export function DiscoveryPanel({data, mutate, saving, connected, mode='all'}: {
     <div className="form-grid">
      <label>Company name<input name="company" required maxLength={200}/></label>
      <label>Provider<select name="provider"><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option><option value="lever-eu">Lever EU</option><option value="ashby">Ashby</option><option value="workable">Workable</option><option value="workday">Workday</option><option value="smartrecruiters">SmartRecruiters</option><option value="rippling">Rippling ATS</option><option value="oracle">Oracle Recruiting Cloud</option><option value="remoteok">Remote OK</option><option value="remotive">Remotive</option><option value="arbeitnow">Arbeitnow</option><option value="weworkremotely">We Work Remotely RSS</option></select></label>
-     <label>Board token<input name="token" required maxLength={200}/></label><label>Source query (optional, Workday / SmartRecruiters)<input name="searchText" maxLength={200} placeholder="frontend"/></label>
+     <label>Board token<input name="token" required maxLength={200}/></label><label>Source query (optional, Workday / SmartRecruiters / Oracle)<input name="searchText" maxLength={200} placeholder="frontend"/></label>
     </div>
-    <p className="fine-print">Hosted boards use their company token. Workday: tenant/wdN/site. Oracle: tenant.fa.region.oraclecloud.com/site. Remote feeds: all. Verify company identity before saving. Workday and SmartRecruiters can have separate query scopes (for example frontend and SAP); each scope has its own scan schedule. Remote feeds preserve their own source links; country eligibility needs review.</p>
+    <p className="fine-print">Hosted boards use their company token. Workday: tenant/wdN/site. Oracle: tenant.fa.region.oraclecloud.com/site. Remote feeds: all. Verify company identity before saving. Workday, SmartRecruiters and Oracle can have separate query scopes (for example frontend and SAP); each scope has its own scan schedule. Remote feeds preserve their own source links; country eligibility needs review.</p>
     <button className="secondary" disabled={!connected||saving||busy}>Save board</button>
    </form>
   </details>}
